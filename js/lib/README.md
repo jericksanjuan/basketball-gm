@@ -34,3 +34,6 @@ https://lists.w3.org/Archives/Public/public-webapps/2015AprJun/0126.html
 
 html2canvas.js has a change on lines 2818-2819 to fix background color always
 being set to transparent.
+
+JSXTransformer.js is the version from
+https://github.com/philix/jsx-requirejs-plugin

@@ -1,3 +1,12 @@
+REACT
+-----
+
+Convert a really simple page like message.js to React
+  make sure the JSX gets compiled by r.js
+    https://github.com/philix/jsx-requirejs-plugin#configuration-options- says I might need .jsx extension and some other stuff
+
+Switch to react production version when ready
+
 CURRENT
 -------
 

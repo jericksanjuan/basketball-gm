@@ -9,6 +9,9 @@
 
 require.config({
     paths: {
+        "jsx": "lib/jsx",
+        "JSXTransformer": "lib/JSXTransformer",
+        "react": "lib/react",
         "stripe-checkout": "https://checkout.stripe.com/checkout",
         "stripe": "https://js.stripe.com/v2/?1" // https://coderwall.com/p/y4vk_q/requirejs-and-external-scripts
     },
