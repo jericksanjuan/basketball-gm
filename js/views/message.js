@@ -43,22 +43,17 @@ define(["dao", "globals", "ui", "core/league", "lib/knockout", "lib/react", "uti
                     return ui.updatePlayMenu(null);
                 }
             }).then(function () {
-                this.setState({message: message});
-            }.bind(this));
-        },
-        getInitialState: function() {
-            return {
-                message: {
-                    from: "",
-                    year: "",
-                    text: ""
+                if (this.isMounted()) {
+                    this.setState({message: message});
                 }
-            };
+            }.bind(this));
         },
         componentDidMount: function() {
             this.loadMessage();
         },
         render: function() {
+            if (this.state === null) { return <div>PLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDERPLACEHOLDER</div>; }
+
             return (
                 <div>
                     <h4 style={{marginTop: "23px"}}>
