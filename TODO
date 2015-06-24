@@ -4,6 +4,7 @@ REACT
 Convert a really simple page like message.js to React
   how can i get it to not start rendering until async loading of data from indexeddb occurs? if i can't, there will always be flicker
   is getInitialState needed? can it be asynchronous?
+    could pass in via props, but then it gets messy when those props change
   new window link
   inbox link
   title
