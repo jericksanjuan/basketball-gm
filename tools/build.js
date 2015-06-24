@@ -15,13 +15,14 @@ function minifyJs(cb) {
 
     requirejs.optimize({
         baseUrl: "js",
-        optimize: "uglify2",
+        optimize: "none",
         preserveLicenseComments: false,
-        generateSourceMaps: true,
+        generateSourceMaps: false,
         name: "app",
         include: "lib/require",
         mainConfigFile: "js/app.js",
-        out: "gen/app.js"
+        out: "gen/app.js",
+        stubModules: ['jsx', 'text', 'JSXTransformer']
     }, cb);
 }
 

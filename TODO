@@ -7,11 +7,12 @@ Convert a really simple page like message.js to React
   inbox link
   title
   updateEvents
-  make sure the JSX gets compiled by r.js
-    https://github.com/philix/jsx-requirejs-plugin#configuration-options- says I might need .jsx extension and some other stuff
   scroll to top on link click
     where does this happen?
   any other bbgmView functionality?
+
+r.js
+  kind of works now. it puts RequireJS at the bottom of app.js, leading to an error. This can be corrected by manually looking for RequireJS 2.1.9 in app.js and moving that and everything below it to the top.
 
 Switch to react production version when ready
 
