@@ -2,8 +2,16 @@ REACT
 -----
 
 Convert a really simple page like message.js to React
+  is getInitialState needed? can it be asynchronous?
+  new window link
+  inbox link
+  title
+  updateEvents
   make sure the JSX gets compiled by r.js
     https://github.com/philix/jsx-requirejs-plugin#configuration-options- says I might need .jsx extension and some other stuff
+  scroll to top on link click
+    where does this happen?
+  any other bbgmView functionality?
 
 Switch to react production version when ready
 
