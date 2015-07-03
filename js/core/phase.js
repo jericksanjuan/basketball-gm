@@ -605,20 +605,57 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         index: "tid",
                         key: IDBKeyRange.lowerBound(0),
                         callback: function (p) {
-                            var contract, factor;
+                            var contract, factor, age, payroll;
 
                             if (p.contract.exp <= g.season && (g.userTids.indexOf(p.tid) < 0 || g.autoPlaySeasons > 0)) {
+
                                 // Automatically negotiate with teams
                                 if (strategies[p.tid] === "rebuilding") {
                                     factor = 0.4;
+
                                 } else {
                                     factor = 0;
+                                }
+
+                                 // Get age
+                                if (p.draft.year > g.season) {
+                                    // Draft prospect
+                                    age = p.draft.year - p.born.year;
+                                } else {
+                                    age = g.season - p.born.year;
+                                }
+
+
+                                // Make it more likely for teams to resign starters and stars.
+                                if (p.value >= 65) {
+                                    factor -= 0.2;
+                                }
+
+                                if (p.value >= 75) {
+                                    factor -= 0.1;
+                                }
+
+
+                                // If rebuilding, less chance to keep older players.
+                                if (age >= 25 && age < 30) {
+                                    factor += 0.1;
+                                }
+
+                                if (age > 30) {
+                                    factor += 0.2;
                                 }
 
                                 if (Math.random() < p.value / 100 - factor) { // Should eventually be smarter than a coin flip
                                     // See also core.team
                                     contract = player.genContract(p);
                                     contract.exp += 1; // Otherwise contracts could expire this season
+
+
+                                    // TODO: Make contending teams more likely to go over cap than rebuilding teams, need payroll here.
+                                    // if (contract.amount + payroll > g.luxuryTax && Math.random() < 0.4 + factor) {
+                                    //     return player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods);
+                                    // }
+
                                     p = player.setContract(p, contract, true);
                                     p.gamesUntilTradable = 15;
 

@@ -16,7 +16,7 @@ define(["lib/knockout"], function (ko) {
     g.divs = [{did: 0, cid: 0, name: "Atlantic"}, {did: 1, cid: 0, name: "Central"}, {did: 2, cid: 0, name: "Southeast"}, {did: 3, cid: 1, name: "Southwest"}, {did: 4, cid: 1, name: "Northwest"}, {did: 5, cid: 1, name: "Pacific"}];
     g.salaryCap = 60000;  // [thousands of dollars]
     g.minPayroll = 40000;  // [thousands of dollars]
-    g.luxuryPayroll = 65000;  // [thousands of dollars]
+    g.luxuryPayroll = 70000;  // [thousands of dollars]
     g.luxuryTax = 1.5;
     g.minContract = 500;  // [thousands of dollars]
     g.maxContract = 20000;  // [thousands of dollars]

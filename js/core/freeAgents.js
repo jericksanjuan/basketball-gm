@@ -52,15 +52,30 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     return;
                 }
 
+                if (strategies[tid] === "rebuilding") {
+                    // Prioritize younger high valued free agents
+                    players.sort(function (a, b) {
+                        var x = b.value - a.value;
+                        return x == 0? a.born.year - b.born.year: x;
+                    });
+                } else {
+                    // For contending teams, prioritize high valued veterans
+                    players.sort(function (a, b) {
+                        var x = b.value - a.value;
+                        return x == 0? b.born.year - a.born.year: x;
+                    });
+                }
+
                 // Small chance of actually trying to sign someone in free agency, gets greater as time goes on
                 if (g.phase === g.PHASE.FREE_AGENCY && Math.random() < 0.99 * g.daysLeft / 30) {
                     return;
                 }
 
                 // Skip rebuilding teams sometimes
-                if (strategies[tid] === "rebuilding" && Math.random() < 0.7) {
-                    return;
-                }
+                // FIXME: Why? Can also rebuild through free agency and they usually have cap space.
+                // if (strategies[tid] === "rebuilding" && Math.random() < 0.7) {
+                //     return;
+                // }
 
 /*                    // Randomly don't try to sign some players this day
                 while (g.phase === g.PHASE.FREE_AGENCY && Math.random() < 0.7) {

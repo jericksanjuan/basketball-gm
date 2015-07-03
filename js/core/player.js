@@ -135,7 +135,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
      * @return {Object.<string, number>} Object containing two properties with integer values, "amount" with the contract amount in thousands of dollars and "exp" with the contract expiration year.
      */
     function genContract(p, randomizeExp, randomizeAmount, noLimit) {
-        var amount, expiration, maxAmount, minAmount, potentialDifference, ratings, years;
+        var amount, expiration, maxAmount, minAmount, potentialDifference, ratings, years, age;
 
         ratings = _.last(p.ratings);
 
@@ -170,6 +170,20 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         } else if (ratings.pot < 60) {
             years = 3;
         }
+
+
+        // Old players should only ask for short deals
+        if (p.draft.year > g.season) {
+            // Draft prospect
+            age = p.draft.year - p.born.year;
+        } else {
+            age = g.season - p.born.year;
+        }
+
+        if (age > 30 && ratings.pot >= 60) {
+            years = 3  // override 5 years
+        }
+
 
         // Randomize expiration for contracts generated at beginning of new game
         if (randomizeExp) {
@@ -1578,7 +1592,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
      *     ratings.
      */
     function value(p, ps, options) {
-        var age, current, potential, pr, ps1, ps2, s;
+        var age, current, potential, pr, ps1, ps2, s, ageDiff;
 
         options = options !== undefined ? options : {};
         options.noPot = options.noPot !== undefined ? options.noPot : false;
@@ -1668,20 +1682,10 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         if (age === 29) {
             return 0.975 * current;
         }
-        if (age === 30) {
-            return 0.95 * current;
-        }
-        if (age === 31) {
-            return 0.9 * current;
-        }
-        if (age === 32) {
-            return 0.85 * current;
-        }
-        if (age === 33) {
-            return 0.8 * current;
-        }
-        if (age > 33) {
-            return 0.7 * current;
+        if (age >= 30) {
+            ageDiff = age - 28;
+            var ageFactor = 1-0.03*ageDiff
+            return ageFactor * current;
         }
     }
 
