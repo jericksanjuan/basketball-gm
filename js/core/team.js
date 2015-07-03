@@ -1121,9 +1121,47 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                 }
 
                 exponential = _.reduce(players, function (memo, p) {
-                    var contractSeasonsRemaining, contractValue, playerValue, value;
+                    var contractSeasonsRemaining, contractValue, playerValue, value, ageFactor;
 
                     playerValue = p.value;
+                    console.log(p);
+
+                    console.log('before: ' + playerValue);
+
+                    // Age factor for star players
+                    if (p.age <= 24) {
+                        ageFactor = 1;
+                    } else if (p.age > 24 && p.age <= 29) {
+                        ageFactor = 0.9;
+                    } else if (p.age > 29 && p.age <= 32 ) {
+                        ageFactor = 0.8;
+                    } else {
+                        ageFactor = 0.6;
+                    }
+
+                    // Multiply value of draft picks, former lottery picks and star players.
+
+                    if ((p.draftPick && p.contract.amount >= 1.5) && (                  // TOFIX: contract amount for draftPick entries are not consistent,
+                        p.contract.amount <= 5)) {                                      // most entries are below 5 but some are in 500s and 1000s.
+                        playerValue *= (1 + p.contract.amount/5);                       // draft picks
+                    } else if ( p.age <= 24 && p.contract.amount >= 1500 ) {
+                        playerValue *= (1 + Math.min(p.contract.amount, 5000)/5000);    // lottery picks
+                    } else if (p.contract.amount >= 0.9 * g.maxContract) {
+                        // star players
+                        playerValue *= (1 + ageFactor);                                 // star players
+                    } else if (p.contract.amount >= 0.5 * g.maxContract) {
+                        playerValue *= (0.5 + ageFactor);                               // starters
+                    }
+
+
+                    // A rebuilding team should not want a player over 30
+                    // makes it harder to dump salaries on rebuilding teams.
+                    if (strategy === "rebuilding" && (p.age > 30)) {
+                        playerValue *= -1;
+                        console.log(playerValue);
+                    }
+
+                    console.log('after: ' + playerValue);
 
                     if (strategy === "rebuilding") {
                         // Value young/cheap players and draft picks more. Penalize expensive/old players
@@ -1144,8 +1182,10 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                                 playerValue *= 0.975;
                             } else if (p.age === 28) {
                                 playerValue *= 0.95;
-                            } else if (p.age >= 29) {
+                            } else if (p.age === 29) {
                                 playerValue *= 0.9;
+                            } else if (p.age > 30) {
+                                playerValue *= 0.4;
                             }
                         }
                     }
@@ -1249,12 +1289,11 @@ console.log("Total contract amount: " + contractsFactor + " * " + salaryRemoved)
             if (add.length > remove.length) {
                 dv -= add.length - remove.length;
             }
-
-            return dv;
-/*console.log('---');
+console.log('---');
 console.log([sumValues(add), sumContracts(add)]);
 console.log([sumValues(remove), sumContracts(remove)]);
-console.log(dv);*/
+console.log(dv);
+            return dv;
         });
     }
 
