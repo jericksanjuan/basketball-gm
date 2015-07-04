@@ -186,6 +186,10 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         return summary(teams).then(function (s) {
             var outcome;
 
+            if (s.warning && !forceTrade) {
+                return [false, null];
+            }
+
             outcome = "rejected"; // Default
 
             return team.valueChange(teams[1].tid, teams[0].pids, teams[1].pids, teams[0].dpids, teams[1].dpids, null).then(function (dv) {
