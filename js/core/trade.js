@@ -2,7 +2,7 @@
  * @name core.trade
  * @namespace Trades between the user's team and other teams.
  */
-define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers"], function (dao, g, league, player, team, Promise, _, eventLog, helpers) {
+define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/random"], function (dao, g, league, player, team, Promise, _, eventLog, helpers, random) {
     "use strict";
 
     /**
@@ -14,6 +14,146 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
     function get(ot) {
         return dao.trade.get({ot: ot, key: 0}).then(function (tr) {
             return tr.teams;
+        });
+    }
+
+    function createSimTrade() {
+        var tx, teams;
+
+        if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS) {
+            return;
+        }
+
+        teams = [
+        {
+            tid: 28,     //random.randInt(0,30),
+            pids: [3360,],
+            dpids: [],
+        },
+        {
+            tid: 1,    //random.randInt(0,30),
+            pids: [],
+            dpids: [],
+        }];
+
+        console.log(teams);
+
+        return Promise.all([
+            getPickValues(),
+        ]).spread(function (estValues) {
+            return makeItWork(teams, false, estValues).spread(function (found, teams) {
+                if(!found) {
+                    console.log('Trade not found');
+                    return;
+                }
+
+                console.log(teams);
+                applyTrade(teams);
+            })
+        });
+
+    }
+
+    function applyTrade(teams) {
+        var dpids, pids, tids;
+
+        tids = [teams[0].tid, teams[1].tid];
+        pids = [teams[0].pids, teams[1].pids];
+        dpids = [teams[0].dpids, teams[1].dpids];
+
+        return summary(teams).then(function (s) {
+            var outcome;
+
+            outcome = "rejected"; // Default
+
+            return team.valueChange(teams[1].tid, teams[0].pids, teams[1].pids, teams[0].dpids, teams[1].dpids, null).then(function (dv) {
+                var formatAssetsEventLog, tx;
+
+                tx = dao.tx(["draftPicks", "players", "playerStats"], "readwrite");
+
+                if (dv > 0 || forceTrade) {
+                    // Trade players
+                    outcome = "accepted";
+                    [0, 1].forEach(function (j) {
+                        var k;
+
+                        if (j === 0) {
+                            k = 1;
+                        } else if (j === 1) {
+                            k = 0;
+                        }
+
+                        pids[j].forEach(function (pid) {
+                            dao.players.get({
+                                ot: tx,
+                                key: pid
+                            }).then(function (p) {
+                                p.tid = tids[k];
+                                // Don't make traded players untradable
+                                //p.gamesUntilTradable = 15;
+                                p.ptModifier = 1; // Reset
+                                if (g.phase <= g.PHASE.PLAYOFFS) {
+                                    p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
+                                }
+                                dao.players.put({ot: tx, value: p});
+                            });
+                        });
+
+                        dpids[j].forEach(function (dpid) {
+                            dao.draftPicks.get({
+                                ot: tx,
+                                key: dpid
+                            }).then(function (dp) {
+                                dp.tid = tids[k];
+                                dp.abbrev = g.teamAbbrevsCache[tids[k]];
+                                dao.draftPicks.put({ot: tx, value: dp});
+                            });
+                        });
+                    });
+
+                    // Log event
+                    formatAssetsEventLog = function (t) {
+                        var i, strings, text;
+
+                        strings = [];
+
+                        t.trade.forEach(function (p) {
+                            strings.push('<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a>');
+                        });
+                        t.picks.forEach(function (dp) {
+                            strings.push('a ' + dp.desc);
+                        });
+
+                        if (strings.length === 0) {
+                            text = "nothing";
+                        } else if (strings.length === 1) {
+                            text = strings[0];
+                        } else if (strings.length === 2) {
+                            text = strings[0] + " and " + strings[1];
+                        } else {
+                            text = strings[0];
+                            for (i = 1; i < strings.length; i++) {
+                                if (i === strings.length - 1) {
+                                    text += ", and " + strings[i];
+                                } else {
+                                    text += ", " + strings[i];
+                                }
+                            }
+                        }
+
+                        return text;
+                    };
+
+                    eventLog.add(null, {
+                        type: "trade",
+                        text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[0]], g.season]) + '">' + g.teamNamesCache[tids[0]] + '</a> traded ' + formatAssetsEventLog(s.teams[0]) + ' to the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[1]], g.season]) + '">' + g.teamNamesCache[tids[1]] + '</a> for ' + formatAssetsEventLog(s.teams[1]) + '.',
+                        showNotification: true,
+                        pids: pids[0].concat(pids[1]),
+                        tids: tids
+                    });
+                }
+
+            });
         });
     }
 
@@ -793,6 +933,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         makeItWork: makeItWork,
         makeItWorkTrade: makeItWorkTrade,
         filterUntradable: filterUntradable,
-        getPickValues: getPickValues
+        getPickValues: getPickValues,
+        createSimTrade: createSimTrade
     };
 });

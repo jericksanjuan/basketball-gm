@@ -1124,9 +1124,6 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                     var contractSeasonsRemaining, contractValue, playerValue, value, ageFactor;
 
                     playerValue = p.value;
-                    console.log(p);
-
-                    console.log('before: ' + playerValue);
 
                     // Age factor for star players
                     if (p.age <= 24) {
@@ -1158,10 +1155,8 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                     // makes it harder to dump salaries on rebuilding teams.
                     if (strategy === "rebuilding" && (p.age > 30)) {
                         playerValue *= -1;
-                        console.log(playerValue);
                     }
 
-                    console.log('after: ' + playerValue);
 
                     if (strategy === "rebuilding") {
                         // Value young/cheap players and draft picks more. Penalize expensive/old players
@@ -1218,7 +1213,6 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                     if (playerValue < 0) {
                         playerValue = 0;
                     }
-//console.log([playerValue, contractValue]);
 
                     value = playerValue + 0.5 * contractValue;
 
