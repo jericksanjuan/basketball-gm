@@ -2,7 +2,7 @@
  * @name core.trade
  * @namespace Trades between the user's team and other teams.
  */
-define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/random"], function (dao, g, league, player, team, Promise, _, eventLog, helpers, random) {
+define(["dao", "globals", "core/league", "core/season", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/random"], function (dao, g, league, season, player, team, Promise, _, eventLog, helpers, random) {
     "use strict";
 
     /**
@@ -17,40 +17,162 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         });
     }
 
+    function genTradeScenarios() {
+        var SCENARIOS = [
+            'expiring',
+            'disgruntled',
+            'freespace',
+            'lesstax',
+            'roleplayer',
+        ];
+
+        // Select team first, then use a weighted scenario.
+
+        var expiring, disgruntled, freespace, lesstax, roleplayer, outcomes;
+        var randomTeam, expThisSeason, highToLow, areVeterans,
+            starters, stars, roleplayers, wrapper;
+
+        randomTeam = function(x) {
+            var tid = random.randInt(0,29);
+            if(tid === g.userTid || tid === x) {
+                return randomTeam();
+            }
+            return tid;
+        };
+        expThisSeason = function(o) {if(o.contract.exp == g.season) return o; };
+        areVeterans = function(o) {
+            if((g.season - o.born.year >= 28))
+                return o;
+        };
+        roleplayers = function(o) {
+            if(o.contract.amount < 0.5*g.maxContract)
+                return o;
+        };
+        starters = function(o) {
+            if(o.contract.amount >= 0.5*g.maxContract && o.contract.amount < 0.9*g.maxContract)
+                return o;
+        };
+        stars = function(o) {
+            if(o.contract.amount >= 0.9*g.maxContract)
+                return o;
+        };
+        highToLow = function(a, b) { return b.value - a.value; };
+
+        // TOFIX: This does not follow salary cap rules for trades (up to 125%)
+
+        expiring = function(tx, next) {
+            console.log('Looking for expiring contracts');
+            var tid, pid, tid2;
+            tid = randomTeam(g.userTid);
+            tid2 = randomTeam(tid);
+
+
+            if (tid === g.userTid)
+                return false;
+
+            dao.players.getAll({
+                ot: tx,
+                index: "tid",
+                key: tid
+            }).then(function (players) {
+                console.log(players);
+                players = players.filter(expThisSeason);
+                players = players.filter(areVeterans);
+                players = players.filter(starters);
+                if (players.length === 0)
+                    return false;
+                players = players.sort(highToLow);
+                pid = players[0].pid;
+
+                var output = [];
+                output.push({ tid: tid, pids: [pid,], dpids:[]});
+                output.push({ tid: tid2, pids: [], dpids:[]});
+
+                next(output);
+            });
+
+        };
+
+        disgruntled = function(tx, next) {
+            console.log('have to trade disgruntled star');
+            return expiring(tx, next);
+        };
+
+        freespace = function(tx, next) {
+            console.log('looking for expiring deals');
+            return expiring(tx, next);
+        };
+
+        lesstax = function(tx,next) {
+            console.log('moving assets for tax relief');
+            return expiring(tx, next);
+        };
+
+        roleplayer = function(tx, next) {
+            console.log('need that role player');
+            return expiring(tx,next);
+        };
+
+        outcomes = {
+            expiring: expiring,
+            disgruntled: disgruntled,
+            freespace: freespace,
+            lesstax: lesstax,
+            roleplayer: roleplayer
+        };
+        var choice = random.choice(SCENARIOS);
+        console.log(outcomes, choice);
+        return outcomes[choice];
+    }
+
     function createSimTrade() {
-        var tx, teams;
+        // Base occurrence on remaining days of season
+        return season.getSchedule().then(function (schedule) {
+            var  tradeChance;
+            if (schedule.length > 41) {
+                tradeChance = 0.25;
+            } else if(schedule.length <= 41 && schedule.length >= 28) {
+                tradeChance = 0.75;
+            } else {
+                tradeChance = 0.5;
+            }
+            console.log(tradeChance, '% chance of trade.');
+            return _createSimTrade(tradeChance);
+        });
+    }
+
+    function _createSimTrade(tradeChance) {
+        var tx, teams, executeScene, next;
+
+        if (Math.random() < tradeChance) {
+            return;     // only 25% chance of trade and lesser chance of a successful trade.
+        }
 
         if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS) {
             return;
         }
 
-        teams = [
-        {
-            tid: 28,     //random.randInt(0,30),
-            pids: [3360,],
-            dpids: [],
-        },
-        {
-            tid: 1,    //random.randInt(0,30),
-            pids: [],
-            dpids: [],
-        }];
+        executeScene = genTradeScenarios();
+        console.log(executeScene);
 
-        console.log(teams);
+        next = (function(teams){
 
-        return Promise.all([
-            getPickValues(),
-        ]).spread(function (estValues) {
-            return makeItWork(teams, false, estValues).spread(function (found, teams) {
-                if(!found) {
-                    console.log('Trade not found');
-                    return;
-                }
+            return Promise.all([
+                getPickValues(),
+            ]).spread(function (estValues) {
+                return makeItWork(teams, false, estValues).spread(function (found, teams) {
+                    if(!found) {
+                        console.log('Trade not found');
+                        return;
+                    }
 
-                console.log(teams);
-                applyTrade(teams);
-            })
+                    console.log(teams);
+                    applyTrade(teams);
+                });
+            });
         });
+
+        executeScene(tx, next);
 
     }
 
@@ -149,11 +271,19 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                         text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[0]], g.season]) + '">' + g.teamNamesCache[tids[0]] + '</a> traded ' + formatAssetsEventLog(s.teams[0]) + ' to the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[1]], g.season]) + '">' + g.teamNamesCache[tids[1]] + '</a> for ' + formatAssetsEventLog(s.teams[1]) + '.',
                         showNotification: true,
                         pids: pids[0].concat(pids[1]),
-                        tids: tids
+                        tids: tids.concat(28)  //Temp log all trades;
                     });
                 }
-
             });
+
+            if (outcome === "accepted") {
+                return clear().then(function () { // This includes dbChange
+                    // Auto-sort CPU team roster
+                    team.rosterAutoSort(null, tids[0]);
+                    return team.rosterAutoSort(null, tids[1]);
+
+                });
+            }
         });
     }
 
@@ -828,7 +958,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
      * @return {Promise.Object} Resolves to estimated draft pick values.
      */
     function getPickValues(ot) {
-        var estValues, i, promises;
+        var estValues, i, promises, doProcess;
 
         estValues = {
             default: [75, 73, 71, 69, 68, 67, 66, 65, 64, 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 50, 50, 49, 49, 49, 48, 48, 48, 47, 47, 47, 46, 46, 46, 45, 45, 45, 44, 44, 44, 43, 43, 43, 42, 42, 42, 41, 41, 41, 40, 40, 39, 39, 38, 38, 37, 37] // This is basically arbitrary

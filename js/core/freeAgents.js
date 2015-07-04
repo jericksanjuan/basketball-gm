@@ -2,7 +2,7 @@
  * @name core.freeAgents
  * @namespace Functions related to free agents that didn't make sense to put anywhere else.
  */
-define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, Promise, _, eventLog, helpers, lock, random) {
+define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, trade, Promise, _, eventLog, helpers, lock, random) {
     "use strict";
 
     /**
@@ -240,6 +240,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
             // This is called if there are remaining days to simulate
             cbYetAnother = function () {
+                trade.createSimTrade();
                 decreaseDemands().then(function () {
                     autoSign().then(function () {
                         require("core/league").setGameAttributesComplete({daysLeft: g.daysLeft - 1, lastDbChange: Date.now()}).then(function () {

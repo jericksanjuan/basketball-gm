@@ -1283,10 +1283,10 @@ console.log("Total contract amount: " + contractsFactor + " * " + salaryRemoved)
             if (add.length > remove.length) {
                 dv -= add.length - remove.length;
             }
-console.log('---');
-console.log([sumValues(add), sumContracts(add)]);
-console.log([sumValues(remove), sumContracts(remove)]);
-console.log(dv);
+            // console.log('---');
+            // console.log([sumValues(add), sumContracts(add)]);
+            // console.log([sumValues(remove), sumContracts(remove)]);
+            // console.log(dv);
             return dv;
         });
     }

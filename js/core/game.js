@@ -2,7 +2,7 @@
  * @name core.game
  * @namespace Everything about games except the actual simulation. So, loading the schedule, loading the teams, saving the results, and handling multi-day simulations and what happens when there are no games left to play.
  */
-define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSim", "core/league", "core/phase", "core/player", "core/season", "core/team", "lib/bluebird", "util/advStats", "util/eventLog", "util/lock", "util/helpers", "util/random"], function (dao, g, ui, freeAgents, finances, gameSim, league, phase, player, season, team, Promise, advStats, eventLog, lock, helpers, random) {
+define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSim", "core/league", "core/phase", "core/player", "core/season", "core/team", "core/trade", "lib/bluebird", "util/advStats", "util/eventLog", "util/lock", "util/helpers", "util/random"], function (dao, g, ui, freeAgents, finances, gameSim, league, phase, player, season, team, trade, Promise, advStats, eventLog, lock, helpers, random) {
     "use strict";
 
     function writeTeamStats(tx, results) {
@@ -819,6 +819,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
         // This simulates a day, including game simulation and any other bookkeeping that needs to be done
         cbRunDay = function () {
             if (numDays > 0) {
+                // Create trades between AI teams.
+                trade.createSimTrade();
                 // Hit the DB to check stopGames in case it came from another tab
                 return league.loadGameAttribute(null, "stopGames").then(function () {
                     // If we didn't just stop games, let's play
