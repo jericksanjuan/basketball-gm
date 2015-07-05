@@ -56,12 +56,12 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
 
             info.salaryPaid = current.payrollEndOfSeason;
             info.salary = beforePO ? info.payroll : info.salaryPaid;
-            info.isTaxPaying = beforePO ? info.payroll > g.luxuryPayroll : info.salaryPaid > g.luxuryPayroll;
+            info.isTaxPaying = info.payroll > g.luxuryPayroll;
 
             info.hasLosingRec = current.won/(current.won+current.lost) < 0.55;
             info.hasLosingRecForTwo = seasons.slice(0,2).map(th.getWs).reduce(th.sumf) / seasons.slice(0,2).map(th.getWLs).reduce(th.sumf) < 0.55;
             info.hasLosingRecForThree = seasons.map(th.getWs).reduce(th.sumf) / seasons.map(th.getWLs).reduce(th.sumf) < 0.55;
-            info.losingRecForThree = seasons.map(th.getWs).reduce(th.sumf) / seasons.map(th.getWLs).reduce(th.sumf)
+            info.losingRecForThree = seasons.map(th.getWs).reduce(th.sumf) / seasons.map(th.getWLs).reduce(th.sumf);
 
             info.team = teamr;
             info.tid = teamr.tid;
@@ -76,63 +76,99 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         };
     }
 
-    function genTradeScenarios(team1, teams) {
+    function genTradeScenarios(tm1, teams) {
         var SCENARIOS = [
-            'expiring',
+            'expstarter',
+            'exprole',
             'disgruntled',
             'freespace',
             'lesstax',
-            'roleplayer',
+            'tradepick',
+            'dumppick'
         ];
+        var possible = ['exprole'];
+        var t = tm1;
 
-        if (!team1) {
-            return;
+        if (t.isRebuilding) {
+            console.log('is rebuilding');
+            // Rebuilding teams
+            if (t.isTaxPaying) {
+                possible.push('lesstax');  // even useful players
+            }
+
+            if (t.hasLosingRec) {
+                possible.push('expstarter');
+                possible.push('freespace');
+
+                if(t.hasLosingRecForTwo && t.hasLosingRecForThree && t.hype===0) {
+                    possible.push('disgruntled');  // get best trade for star
+                }
+            }
+
+            if (t.hasSpaceForStart) {
+                possible.push('tradepick');     // chance to get good players
+            }
+
+        } else {
+            console.log('is contending');
+
+            // Contending teams
+            if (t.isTaxPaying) {
+                if(t.isLottery && t.hasLosingRecForTwo) {
+                    possible.push('lesstax');  // even starters
+                }
+
+                if(t.isLottery) {
+                    possible.push('expstarter'); // target teams with space.
+                }
+            }
+
+            if (t.hasSpaceForRole && t.isPlayoff) {  // use pick or expiring contracts to make deals for useful assets.
+                possible.push('dumppick');
+            }
+
+            if (t.isFavorite) {
+                possible.push('dumppick');
+            }
+
+            if (t.hasLosingRecForThree) {
+                possible.push('lesstax');
+            }
+
         }
-
-        console.log(team1);
-        console.log(teams);
-        return;
+        console.log(possible);
 
         // Select team first, then use a weighted scenario.
 
-        var expiring, disgruntled, freespace, lesstax, roleplayer, outcomes;
+        var exprole, expstarter, disgruntled, freespace, lesstax, tradepick, dumppick, outcomes;
 
 
         // contending || salary > luxury tax && rebuilding
         // contending && losing record;
-        expiring = function(tx) {
+        exprole = function(tx, tm1, teams) {
             console.log('Dealing expiring contracts');
-            var tid, pid, tid2;
-            tid = th.randomTeam(g.userTid);
-            tid2 = th.randomTeam(tid);
-            //TODO: create function to get complete info on teams
-            // current record, strategy, cap situation then
-            // look for a suitable trade partner to make an offer.
+            var pid, tm2, ft;
+            teams = teams;
 
-            // TODO: good performing teams should not trade any starter
-            // rebuilding teams should hold on to their expiring contracts.
-            // contending teams > the cap can use them to acquire talent.
+            ft = teams.filter(function(o) {return o.isRebuilding; });
+            tm2 = th.randomTeam(ft);
 
             return Promise.all(
                 [
                     dao.players.getAll({
                         ot: tx,
                         index: "tid",
-                        key: tid
+                        key: tm1.tid
                     }),
-                    dao.teams.getAll({
-                        ot: tx,
-                        key: tid
-                    }),
-                    dao.teams.getAll({
-                        ot: tx,
-                        key: tid2
-                    })
                 ])
-                .spread(function (players, team1, team2) {
-                    console.debug(team1, team2);
+                .spread(function (players) {
+                    console.debug(tm1, tm2);
 
-                    players = players.filter(th.andF(th.expThisSeason, th.atLeastFive, th.areVeterans, th.orF(th.starters, th.roleplayers)));
+                    players = players.filter(
+                        th.andF(th.expThisSeason, th.atLeastFive, th.roleplayers));
+                    if(tm1.isRebuilding) {
+                        players =  players.filter(th.areVeterans);
+                    }
 
                     if (players.length === 0)
                         return false;
@@ -142,54 +178,229 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                     pid = random.choice(players).pid;
 
                     var output = [];
-                    output.push({ tid: tid, pids: [pid,], dpids:[]});
-                    output.push({ tid: tid2, pids: [], dpids:[]});
+                    output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
+                    output.push({ tid: tm2.tid, pids: [], dpids:[]});
 
                     return Promise.try(function() {return output; });
                 });
 
         };
 
-        // losing record for couple of seasons
-        // expiring superstar, 2 years remaining
-        disgruntled = function(tx) {
+        expstarter = function(tx, tm1, teams) {
+            console.log('Dealing expiring contracts');
+            var pid, tm2, ft;
+
+            ft = teams.filter(th.andF(
+                function(o) {return o.isRebuilding; },
+                function(o) {return o.hasSpaceForStart; }
+            ));
+            if (ft.length === 0) {
+                ft = teams.filter(function(o) { return o.isRebuilding; });
+            }
+            tm2 = th.randomTeam(ft);
+
+            return Promise.all(
+                [
+                    dao.players.getAll({
+                        ot: tx,
+                        index: "tid",
+                        key: tm1.tid
+                    }),
+                ])
+                .spread(function (players) {
+                    players = players.filter(
+                        th.andF(th.expThisSeason, th.atLeastFive,
+                            th.orF(th.roleplayers, th.starters)));
+                    if (tm1.isRebuilding) {
+                        players = players.filter(th.areVeterans);
+                    }
+
+                    if (players.length === 0)
+                        return false;
+                    players = players.sort(th.highToLow);
+                    players = players.slice(0,3);
+                    console.log('selection', players);
+                    pid = random.choice(players).pid;
+
+                    var output = [];
+                    output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
+                    output.push({ tid: tm2.tid, pids: [], dpids:[]});
+
+                    return Promise.try(function() {return output; });
+                });
+
+        };
+
+        disgruntled = function(tx, tm1, teams) {
             console.log('have to trade disgruntled star');
-            return expiring(tx);
+            var pid, tm2, ft;
+
+            ft = teams.filter(th.andF(
+                function(o) {return o.isRebuilding; },
+                function(o) {return o.hasSpaceForMax; }
+            ));
+            if (ft.length === 0) {
+                ft = teams.filter(function(o) { return o.isRebuilding; });
+            }
+            tm2 = th.randomTeam(ft);
+
+            return Promise.all(
+                [
+                    dao.players.getAll({
+                        ot: tx,
+                        index: "tid",
+                        key: tm1.tid
+                    }),
+                ])
+                .spread(function (players) {
+                    players = players.filter(
+                        th.andF(th.expThisSeason, th.stars));
+
+                    if (players.length === 0)
+                        return false;
+                    players = players.sort(th.oldestFirst);
+                    players = players.slice(0,3);
+                    console.log('selection', players);
+                    pid = random.choice(players).pid;
+
+                    var output = [];
+                    output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
+                    output.push({ tid: tm2.tid, pids: [], dpids:[]});
+
+                    return Promise.try(function() {return output; });
+                });
         };
 
         // salary > luxury tax
         // rebuilding, give up players with years remaining in contract to teams with space
         // look for players with expiring deals
-        freespace = function(tx) {
-            console.log('looking for expiring deals');
-            return expiring(tx);
+        freespace = function(tx, tm1, teams) {
+            console.log('trading for expiring deals');
+            var pid, tm2, ft, pid2;
+
+            ft = teams.filter(th.andF(
+                function(o) {return o.hasSpaceForStart; }
+            ));
+            if (ft.length === 0) {
+                ft = teams;
+            }
+            tm2 = th.randomTeam(ft);
+
+            return Promise.all(
+                [
+                    dao.players.getAll({
+                        ot: tx,
+                        index: "tid",
+                        key: tm1.tid
+                    }),
+                    dao.players.getAll({
+                        ot: tx,
+                        index: "tid",
+                        key: tm2.tid
+                    }),
+                ])
+                .spread(function (players, others) {
+                    players = players.filter(th.andF(
+                        th.notF(th.expThisSeason),
+                        th.roleplayers,
+                        th.atLeastFive
+                        )
+                    );
+
+                    if (players.length === 0)
+                        return false;
+                    players = players.sort(th.costlyFirst);
+                    players = players.slice(0,3);
+                    console.log('selection', players);
+                    pid = random.choice(players).pid;
+
+                    others = others.filter(th.andF(
+                        th.expThisSeason,
+                        th.atLeastFive
+                    ));
+                    others = others.sort(th.costlyFirst);
+                    others = players.slice(0,3);
+                    pid2 = random.choice(others).pid;
+
+                    var output = [];
+                    output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
+                    output.push({ tid: tm2.tid, pids: [pid2], dpids:[]});
+
+                    return Promise.try(function() {return output; });
+                });
         };
 
-        lesstax = function(tx) {
-            console.log('moving assets for tax relief');
-            return expiring(tx);
+        lesstax = function(tx, tm1, teams) {
+            console.log('moving assets to free lessen tax');
+            var pid, tm2, ft;
+
+            ft = teams.filter(th.andF(
+                function(o) {return o.hasSpaceForStart; }
+            ));
+            if (ft.length === 0) {
+                ft = teams;
+            }
+            tm2 = th.randomTeam(ft);
+
+            return Promise.all(
+                [
+                    dao.players.getAll({
+                        ot: tx,
+                        index: "tid",
+                        key: tm1.tid
+                    }),
+                ])
+                .spread(function (players) {
+                    players = players.filter(th.andF(
+                        th.notF(th.expThisSeason),
+                        th.orF(th.roleplayers, th.starters),
+                        th.atLeastFive
+                        )
+                    );
+
+                    if (players.length === 0)
+                        return false;
+                    players = players.sort(th.costlyFirst);
+                    players = players.slice(0,3);
+                    console.log('selection', players);
+                    pid = random.choice(players).pid;
+
+                    var output = [];
+                    output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
+                    output.push({ tid: tm2.tid, pids: [], dpids:[]});
+
+                    return Promise.try(function() {return output; });
+                });
         };
 
         // contending, offer pick(s) for role players with skills
-        roleplayer = function(tx) {
-            console.log('need that role player');
-            return expiring(tx);
+        tradepick = function(tx, tm1, teams) {
+            console.log('trading pick for player with value');
+            return Promise.try(function() {return false; });
+        };
+
+        dumppick = function(tx, tm1, teams) {
+            console.log('dumping pick for future');
+            return Promise.try(function() {return false; });
         };
 
 
         outcomes = {
-            expiring: expiring,
             disgruntled: disgruntled,
             freespace: freespace,
             lesstax: lesstax,
-            roleplayer: roleplayer
+            exprole: exprole,
+            expstarter: expstarter,
+            tradepick: tradepick,
+            dumppick: dumppick
         };
         var choice = random.choice(SCENARIOS);
-        return outcomes[choice];
+        return [outcomes[choice], tm1, teams];
     }
 
     function _createSimTrade(tradeChance) {
-        var tx, teams, executeScene, next;
+        var tx, tm1, teams, executeScene, next;
+        teams = [];
 
         if (Math.random() > tradeChance) {
             return;
@@ -201,34 +412,34 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         console.log('creating trade...');
 
         tx = dao.tx(["players", "teams", "releasedPlayers"], 'readwrite');
+        var mapFunc = getTeamInfo(tx);
+
 
         Promise.try(function() {
             return dao.teams.getAll({
                 ot: tx
-            })
+            });
+        })
+        .map(mapFunc)
+        .error(function(e) {
+            console.error("error reading database.", e.message);
         })
         .then(function(teams) {
-            var mapFunc = getTeamInfo(tx);
-            var teamInfos = teams.map(mapFunc);     // get info for all teams
-            return Promise.all(teamInfos);
+            tm1 = th.randomTeam(teams);
+            return genTradeScenarios(tm1, teams);
         })
-        .spread(function() {
-            var teams = arguments;
-            return [th.randomTeam(teams), teams];
+        .error(function(e) {
+            console.error("error reading database.", e.message);
         })
-        .then(function(team1, teams) {
-            return genTradeScenarios(team1, teams);
-        })
-        .then(function(executeScene) {
-            if (!executeScene) {
+        .then(function(results) {
+            if (!results[0]) {
                 console.warn('no executeScene');
                 return;
             }
-            console.log(executeScene);
 
-            executeScene(tx)
-                .then(function(teams) {
-                    if(!teams) {
+            results[0](tx, results[1], results[2])
+                .then(function(tradeTeams) {
+                    if(!tradeTeams) {
                         console.log('Trade not found');
                         return;
                     }
@@ -237,14 +448,14 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                         getPickValues(),
                     ])
                     .spread(function (estValues) {
-                        return makeItWork(teams, false, estValues).spread(function (found, teams) {
+                        return makeItWork(tradeTeams, false, estValues).spread(function (found, tradeTeams) {
                             if(!found) {
                                 console.log('Trade not found');
                                 return;
                             }
 
-                            console.log(teams);
-                            applyTrade(teams);
+                            console.log(tradeTeams);
+                            applyTrade(tradeTeams);
                         });
                     });
 
@@ -266,7 +477,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             } else {
                 tradeChance = 0.0;
             }
-            tradeChance = 1.0
+            tradeChance = 1.0;
             return _createSimTrade(tradeChance);
         });
     }
