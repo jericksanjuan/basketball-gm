@@ -45,13 +45,13 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
 
             var starterMoney, starMoney;
             starterMoney = 0.5*g.maxContract;
-            starMoney = 0.9*g.starMoney;
+            starMoney = 0.9*g.maxContract;
 
             info.payroll = payroll;
             info.hasSpace = payroll < g.salaryCap;
             info.capSpace = g.salaryCap - payroll;
-            info.hasSpaceForRole = info.capSpace >= 5000 && info.capSpace < starterMoney;
-            info.hasSpaceForStart = info.capSpace >= starterMoney && info.capSpace < starMoney;
+            info.hasSpaceForRole = info.capSpace >= 5000;
+            info.hasSpaceForStart = info.capSpace >= starterMoney;
             info.hasSpaceForMax = info.capSpace >= starMoney;
 
             info.salaryPaid = current.payrollEndOfSeason;
@@ -59,8 +59,9 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             info.isTaxPaying = beforePO ? info.payroll > g.luxuryPayroll : info.salaryPaid > g.luxuryPayroll;
 
             info.hasLosingRec = current.won/(current.won+current.lost) < 0.55;
-            info.hasLosingRecForTwo = seasons.slice(0,2).reduce(th.totalWins) / seasons.slice(0,2).reduce(th.gamesPlayed) < 0.55;
-            info.hasLosingRecForThree = seasons.reduce(th.totalWins) / seasons.reduce(th.gamesPlayed) < 0.55;
+            info.hasLosingRecForTwo = seasons.slice(0,2).map(th.getWs).reduce(th.sumf) / seasons.slice(0,2).map(th.getWLs).reduce(th.sumf) < 0.55;
+            info.hasLosingRecForThree = seasons.map(th.getWs).reduce(th.sumf) / seasons.map(th.getWLs).reduce(th.sumf) < 0.55;
+            info.losingRecForThree = seasons.map(th.getWs).reduce(th.sumf) / seasons.map(th.getWLs).reduce(th.sumf)
 
             info.team = teamr;
             info.tid = teamr.tid;
@@ -205,7 +206,8 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             return dao.teams.getAll({
                 ot: tx
             })
-        }).then(function(teams) {
+        })
+        .then(function(teams) {
             var mapFunc = getTeamInfo(tx);
             var teamInfos = teams.map(mapFunc);     // get info for all teams
             return Promise.all(teamInfos);

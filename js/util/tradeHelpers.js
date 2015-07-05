@@ -3,7 +3,7 @@ define(["globals", "util/random"], function(g, random){
 
     var randomTeam, notF, andF, orF, expThisSeason, highToLow, areVeterans,
         starters, stars, roleplayers, atLeastFive, pids, dpids, tids,
-        totalWins, gamesPlayed;
+        getWs, getWLs, sumf;
 
     randomTeam = function(teams, ban) {
         var selected = random.choice(teams);
@@ -62,10 +62,11 @@ define(["globals", "util/random"], function(g, random){
     pids = function(o) { return o.pid; };
     dpids = function(o) { return o.dpid; };
     tids = function(o) { return o.tid; };
+    getWs = function(o) { return o.won; };
+    getWLs = function(o) { return o.won + o.lost; };
 
-    // map
-    totalWins = function(a, b) { return a.won + b.won; };
-    gamesPlayed = function(a, b) { return a.won + b.won + a.lost + b.lost; };
+    // reduce
+    sumf = function(a, b) { return a + b };
 
     return {
         randomTeam, randomTeam,
@@ -82,7 +83,8 @@ define(["globals", "util/random"], function(g, random){
         pids: pids,
         dpids: dpids,
         tids: tids,
-        totalWins: totalWins,
-        gamesPlayed: gamesPlayed
+        getWs: getWs,
+        getWLs: getWLs,
+        sumf: sumf
     };
 });
