@@ -1,4 +1,4 @@
-/**
+  /**
  * @name core.trade
  * @namespace Trades between the user's team and other teams.
  */
@@ -17,7 +17,65 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         });
     }
 
-    function genTradeScenarios() {
+    function _getTeamInfo(tx, teamr) {
+        return Promise.all([
+            team.getPayroll(tx, teamr.tid)
+        ])
+        .spread(function(payrollr) {
+            var info = {};
+
+            var payroll = payrollr[0];
+
+            info.isRebuilding = teamr.strategy === 'rebuilding';
+            info.isContending =  teamr.strategy === 'contending';
+
+            var beforePO = g.phase < g.PHASE.PLAYOFFS;
+
+            var seasons = teamr.seasons.reverse().slice(0,3);    // get only last three seasons
+            var current = seasons[0];
+
+            info.cash = current.cash;
+            info.hype = current.hype;
+
+
+            info.isLottery = beforePO ? current.won/(current.won+current.lost) < 0.55 : current.playoffRoundsWon === -1;
+            info.isPlayoff = !info.isLottery;
+            info.isFavorite = current.won/(current.won+current.lost) > 0.73;
+            info.isChampion = current.playoffRoundsWon === 4;
+
+            var starterMoney, starMoney;
+            starterMoney = 0.5*g.maxContract;
+            starMoney = 0.9*g.starMoney;
+
+            info.payroll = payroll;
+            info.hasSpace = payroll < g.salaryCap;
+            info.capSpace = g.salaryCap - payroll;
+            info.hasSpaceForRole = info.capSpace >= 5000 && info.capSpace < starterMoney;
+            info.hasSpaceForStart = info.capSpace >= starterMoney && info.capSpace < starMoney;
+            info.hasSpaceForMax = info.capSpace >= starMoney;
+
+            info.salaryPaid = current.payrollEndOfSeason;
+            info.salary = beforePO ? info.payroll : info.salaryPaid;
+            info.isTaxPaying = beforePO ? info.payroll > g.luxuryPayroll : info.salaryPaid > g.luxuryPayroll;
+
+            info.hasLosingRec = current.won/(current.won+current.lost) < 0.55;
+            info.hasLosingRecForTwo = seasons.slice(0,2).reduce(th.totalWins) / seasons.slice(0,2).reduce(th.gamesPlayed) < 0.55;
+            info.hasLosingRecForThree = seasons.reduce(th.totalWins) / seasons.reduce(th.gamesPlayed) < 0.55;
+
+            info.team = teamr;
+            info.tid = teamr.tid;
+
+            return info;
+        });
+    }
+
+    function getTeamInfo(tx) {
+        return function() {
+            return _getTeamInfo(tx, arguments[0]);
+        };
+    }
+
+    function genTradeScenarios(team1, teams) {
         var SCENARIOS = [
             'expiring',
             'disgruntled',
@@ -26,19 +84,17 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             'roleplayer',
         ];
 
+        if (!team1) {
+            return;
+        }
+
+        console.log(team1);
+        console.log(teams);
+        return;
+
         // Select team first, then use a weighted scenario.
 
         var expiring, disgruntled, freespace, lesstax, roleplayer, outcomes;
-        var randomTeam;
-
-        randomTeam = function(x) {
-            var tid = random.randInt(0,29);
-            if(tid === g.userTid || tid === x) {
-                return randomTeam();
-            }
-            return tid;
-        };
-
 
 
         // contending || salary > luxury tax && rebuilding
@@ -46,8 +102,8 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         expiring = function(tx) {
             console.log('Dealing expiring contracts');
             var tid, pid, tid2;
-            tid = randomTeam(g.userTid);
-            tid2 = randomTeam(tid);
+            tid = th.randomTeam(g.userTid);
+            tid2 = th.randomTeam(tid);
             //TODO: create function to get complete info on teams
             // current record, strategy, cap situation then
             // look for a suitable trade partner to make an offer.
@@ -73,21 +129,8 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                     })
                 ])
                 .spread(function (players, team1, team2) {
-                    console.log(team1, team2);
-                    var vets, startVets, roleVets;
-                    console.log('expiring',  players.filter(th.expThisSeason));
-                    console.log('not expiring', players.filter(th.notF(th.expThisSeason)));
-                    console.log('vet starters', players.filter(th.andF(th.expThisSeason, th.areVeterans, th.starters)));
-                    console.log('vet rolep', players.filter(th.andF(th.expThisSeason, th.areVeterans, th.roleplayers)));
-                    console.log('vet start and role', players.filter(th.andF(th.expThisSeason, th.areVeterans, th.orF(th.starters, th.roleplayers))));
+                    console.debug(team1, team2);
 
-                    // players = players.filter(expThisSeason);
-                    // players = players.filter(atLeastFive);
-
-                    // vets = players.filter(areVeterans);
-                    // startVets = vets.filter(starters);
-                    // roleVets =  vets.filter(roleplayers);
-                    // players = startVets.concat(roleVets);
                     players = players.filter(th.andF(th.expThisSeason, th.atLeastFive, th.areVeterans, th.orF(th.starters, th.roleplayers)));
 
                     if (players.length === 0)
@@ -144,6 +187,70 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         return outcomes[choice];
     }
 
+    function _createSimTrade(tradeChance) {
+        var tx, teams, executeScene, next;
+
+        if (Math.random() > tradeChance) {
+            return;
+        }
+
+        if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS) {
+            return;
+        }
+        console.log('creating trade...');
+
+        tx = dao.tx(["players", "teams", "releasedPlayers"], 'readwrite');
+
+        Promise.try(function() {
+            return dao.teams.getAll({
+                ot: tx
+            })
+        }).then(function(teams) {
+            var mapFunc = getTeamInfo(tx);
+            var teamInfos = teams.map(mapFunc);     // get info for all teams
+            return Promise.all(teamInfos);
+        })
+        .spread(function() {
+            var teams = arguments;
+            return [th.randomTeam(teams), teams];
+        })
+        .then(function(team1, teams) {
+            return genTradeScenarios(team1, teams);
+        })
+        .then(function(executeScene) {
+            if (!executeScene) {
+                console.warn('no executeScene');
+                return;
+            }
+            console.log(executeScene);
+
+            executeScene(tx)
+                .then(function(teams) {
+                    if(!teams) {
+                        console.log('Trade not found');
+                        return;
+                    }
+
+                    return Promise.all([
+                        getPickValues(),
+                    ])
+                    .spread(function (estValues) {
+                        return makeItWork(teams, false, estValues).spread(function (found, teams) {
+                            if(!found) {
+                                console.log('Trade not found');
+                                return;
+                            }
+
+                            console.log(teams);
+                            applyTrade(teams);
+                        });
+                    });
+
+                });
+        });
+
+    }
+
     function createSimTrade() {
         // Base occurrence on remaining days of season
         return season.getDaysLeftSchedule().then(function (schedule) {
@@ -157,50 +264,9 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             } else {
                 tradeChance = 0.0;
             }
+            tradeChance = 1.0
             return _createSimTrade(tradeChance);
         });
-    }
-
-    function _createSimTrade(tradeChance) {
-        var tx, teams, executeScene, next;
-
-        if (Math.random() > tradeChance) {
-            return;
-        }
-
-        if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS) {
-            return;
-        }
-        console.log('creating trade...');
-
-        executeScene = genTradeScenarios();
-        console.log(executeScene);
-
-        tx = dao.tx(["players", "teams"]);
-        executeScene(tx)
-            .then(function(teams) {
-                if(!teams) {
-                    console.log('Trade not found');
-                    return;
-                }
-
-                return Promise.all([
-                    getPickValues(),
-                ])
-                .spread(function (estValues) {
-                    return makeItWork(teams, false, estValues).spread(function (found, teams) {
-                        if(!found) {
-                            console.log('Trade not found');
-                            return;
-                        }
-
-                        console.log(teams);
-                        applyTrade(teams);
-                    });
-                });
-
-            });
-
     }
 
     function applyTrade(teams) {

@@ -1,9 +1,19 @@
-define(["globals"], function(g){
+define(["globals", "util/random"], function(g, random){
     "use strict";
 
-    var notF, andF, orF, expThisSeason, highToLow, areVeterans,
-        starters, stars, roleplayers, atLeastFive;
+    var randomTeam, notF, andF, orF, expThisSeason, highToLow, areVeterans,
+        starters, stars, roleplayers, atLeastFive, pids, dpids, tids,
+        totalWins, gamesPlayed;
 
+    randomTeam = function(teams, ban) {
+        var selected = random.choice(teams);
+        if(selected.tid === g.userTid || selected.tid === ban) {
+            return randomTeam();
+        }
+        return selected;
+    };
+
+    // filter
     notF = function(func) { return function(){ return !func.apply(this, arguments);};};
 
     andF = function() {
@@ -14,7 +24,7 @@ define(["globals"], function(g){
                     return false;
             }
             return true;
-        }
+        };
     };
     orF = function() {
         var funcs = arguments;
@@ -24,7 +34,7 @@ define(["globals"], function(g){
                     return true;
             }
             return false;
-        }
+        };
     };
 
     expThisSeason = function(o) { return o.contract.exp === g.season; };
@@ -45,9 +55,20 @@ define(["globals"], function(g){
         return o.contract.amount >= 0.9*g.maxContract;
     };
 
+    // sort
     highToLow = function(a, b) { return b.value - a.value; };
 
+    // map
+    pids = function(o) { return o.pid; };
+    dpids = function(o) { return o.dpid; };
+    tids = function(o) { return o.tid; };
+
+    // map
+    totalWins = function(a, b) { return a.won + b.won; };
+    gamesPlayed = function(a, b) { return a.won + b.won + a.lost + b.lost; };
+
     return {
+        randomTeam, randomTeam,
         notF: notF,
         andF: andF,
         orF: orF,
@@ -58,5 +79,10 @@ define(["globals"], function(g){
         stars: stars,
         roleplayers: roleplayers,
         atLeastFive: atLeastFive,
-    }
+        pids: pids,
+        dpids: dpids,
+        tids: tids,
+        totalWins: totalWins,
+        gamesPlayed: gamesPlayed
+    };
 });
