@@ -8,7 +8,7 @@ define(["globals", "util/random"], function(g, random){
     randomTeam = function(teams, ban) {
         var selected = random.choice(teams);
         if(selected.tid === g.userTid || selected.tid === ban) {
-            return randomTeam();
+            return randomTeam(teams, ban);
         }
         return selected;
     };

@@ -151,7 +151,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             teams = teams;
 
             ft = teams.filter(function(o) {return o.isRebuilding; });
-            tm2 = th.randomTeam(ft);
+            tm2 = th.randomTeam(ft, tm1.tid);
 
             return Promise.all(
                 [
@@ -197,7 +197,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             if (ft.length === 0) {
                 ft = teams.filter(function(o) { return o.isRebuilding; });
             }
-            tm2 = th.randomTeam(ft);
+            tm2 = th.randomTeam(ft, tm1.tid);
 
             return Promise.all(
                 [
@@ -242,7 +242,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             if (ft.length === 0) {
                 ft = teams.filter(function(o) { return o.isRebuilding; });
             }
-            tm2 = th.randomTeam(ft);
+            tm2 = th.randomTeam(ft, tm1.tid);
 
             return Promise.all(
                 [
@@ -284,7 +284,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             if (ft.length === 0) {
                 ft = teams;
             }
-            tm2 = th.randomTeam(ft);
+            tm2 = th.randomTeam(ft, tm1.tid);
 
             return Promise.all(
                 [
@@ -340,7 +340,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             if (ft.length === 0) {
                 ft = teams;
             }
-            tm2 = th.randomTeam(ft);
+            tm2 = th.randomTeam(ft, tm1.tid);
 
             return Promise.all(
                 [
@@ -425,7 +425,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             console.error("error reading database.", e.message);
         })
         .then(function(teams) {
-            tm1 = th.randomTeam(teams);
+            tm1 = th.randomTeam(teams, g.userTid);
             return genTradeScenarios(tm1, teams);
         })
         .error(function(e) {
