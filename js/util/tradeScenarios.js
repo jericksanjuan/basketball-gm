@@ -23,7 +23,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 console.debug(tm1, tm2);
 
                 players = players.filter(
-                    th.andF(th.expThisSeason, th.atLeastFive, th.roleplayers, th.areVeterans));
+                    th.andF(th.expThisSeason, th.atLeastFive, th.roleplayers, th.areVeterans, th.tradeable));
 
                 if (players.length === 0)
                     return false;
@@ -66,7 +66,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 players = players.filter(
                     th.andF(th.expThisSeason, th.atLeastFive,
                         th.orF(th.roleplayers, th.starters),
-                        th.areVeterans));
+                        th.areVeterans, th.tradeable));
 
                 if (players.length === 0)
                     return false;
@@ -107,7 +107,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
             ])
             .spread(function (players) {
                 players = players.filter(
-                    th.andF(th.expThisSeason, th.stars));
+                    th.andF(th.expThisSeason, th.stars, th.tradeable));
 
                 if (players.length === 0)
                     return false;
@@ -154,7 +154,8 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 players = players.filter(th.andF(
                     th.notF(th.expThisSeason),
                     th.roleplayers,
-                    th.atLeastFive
+                    th.atLeastFive,
+                    th.tradeable
                     )
                 );
 
@@ -166,7 +167,8 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 pid = random.choice(players).pid;
 
                 others = others.filter(th.andF(
-                    th.expThisSeason
+                    th.expThisSeason,
+                    th.tradeable
                 ));
                 others = others.sort(th.costlyFirst);
                 others = players.slice(0,3);
@@ -205,7 +207,8 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
             .spread(function (players) {
                 players = players.filter(th.andF(
                     th.notF(th.expThisSeason),
-                    th.orF(th.roleplayers, th.starters)
+                    th.orF(th.roleplayers, th.starters),
+                    th.tradeable
                     )
                 );
 
@@ -268,6 +271,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                     }
                 }
 
+                players = players.filter(th.tradeable);
                 players = players.filter(filters);
 
                 if (players.length === 0)

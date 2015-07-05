@@ -3,7 +3,7 @@ define(["globals", "util/random"], function(g, random){
 
     var randomTeam, notF, andF, orF, expThisSeason, highToLow, areVeterans,
         starters, stars, roleplayers, atLeastFive, pids, dpids, tids,
-        getWs, getWLs, sumf, oldestFirst, costlyFirst;
+        getWs, getWLs, sumf, oldestFirst, costlyFirst, tradeable;
 
     randomTeam = function(teams, ban) {
         var selected = random.choice(teams);
@@ -55,6 +55,10 @@ define(["globals", "util/random"], function(g, random){
         return o.contract.amount >= 0.9*g.maxContract;
     };
 
+    tradeable = function(o) {
+        return o.gamesUntilTradeable === 0;
+    }
+
     // sort
     highToLow = function(a, b) { return b.value - a.value; };
     oldestFirst = function(a, b) { return a.born.year - b.born.year; };
@@ -89,6 +93,7 @@ define(["globals", "util/random"], function(g, random){
         getWLs: getWLs,
         sumf: sumf,
         oldestFirst: oldestFirst,
-        costlyFirst: costlyFirst
+        costlyFirst: costlyFirst,
+        tradeable: tradeable
     };
 });
