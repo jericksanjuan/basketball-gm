@@ -59,6 +59,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             info.isTaxPaying = info.payroll > g.luxuryPayroll;
 
             info.gp = current.won + current.lost;
+            info.winp = current.won / info.gp;
             info.hasLosingRec = current.won/(info.gp) < 0.55;
             info.hasLosingRecForTwo = seasons.slice(0,2).map(th.getWs).reduce(th.sumf) / seasons.slice(0,2).map(th.getWLs).reduce(th.sumf) < 0.55;
             info.hasLosingRecForThree = seasons.map(th.getWs).reduce(th.sumf) / seasons.map(th.getWLs).reduce(th.sumf) < 0.55;
@@ -87,13 +88,21 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             'tradepick',
             'dumppick'
         ];
-
-        var possible = ['exprole'];
-        if (g.phase == g.PHASE.FREE_AGENCY) {
-            possible = ['freeforall'];
-        }
         var t = tm1;
         console.log(t);
+
+        var possible = [];
+        if (g.phase == g.PHASE.FREE_AGENCY) {
+            possible = ['freeforall'];
+
+            if (t.isTaxPaying && !t.isFavorite ) {
+                possible.push('lesstax');
+            }
+
+            if (t.hype < 0.2) {
+                possible.push('disgruntled');
+            }
+        }
 
         if (t.isRebuilding) {
             console.log('is rebuilding');
@@ -113,7 +122,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                 }
             }
 
-            if (t.hasSpaceForRole && t.gp>40 ) {
+            if (t.gp>40 && t.winp > random.uniform(0.20, 0.60) ) {
                 possible.push('tradepick');     // chance to get good players
             }
 
@@ -122,7 +131,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
 
             // Contending teams
             if (t.isTaxPaying && t.gp > 27) {
-                if(t.isLottery && t.hasLosingRecForTwo) {
+                if(t.isLottery) {
                     possible.push('lesstax');  // even starters
                 }
 
@@ -132,7 +141,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             }
 
             if (t.gp > 40) {
-                if (t.hasSpaceForRole && t.isPlayoff) {  // use pick or expiring contracts to make deals for useful assets.
+                if (t.isPlayoff && t.winp > random.uniform(0.45, 0.75)) {  // use pick or expiring contracts to make deals for useful assets.
                     possible.push('dumppick');
                 }
 
@@ -141,6 +150,10 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                 }
             }
 
+        }
+
+        if(possible.length === 0) {
+            possible.push('exprole');
         }
 
         var outcomes = {
@@ -154,6 +167,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             freeforall: tscene.freeforall
         };
         var choice = random.choice(possible);
+        console.log("choice:", choice);
         return [outcomes[choice], tm1, teams, choice];
     }
 
@@ -161,16 +175,16 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         var tx, tm1, teams, executeScene, next;
         teams = [];
 
-        if (Math.random() > tradeChance) {
-            return;
-        }
+        // if (Math.random() > tradeChance) {
+        //     return;
+        // }
 
         if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS) {
             return;
         }
         console.log('creating trade...');
 
-        tx = dao.tx(["players", "teams", "releasedPlayers"], 'readwrite');
+        tx = dao.tx(["players", "playerStats", "teams", "releasedPlayers", "draftPicks"], 'readwrite');
         var mapFunc = getTeamInfo(tx);
 
 
@@ -228,11 +242,11 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         return season.getDaysLeftSchedule().then(function (schedule) {
             var  tradeChance;
             if (schedule > 50) {
-                tradeChance = 0.25;
+                tradeChance = 0.40;
             } else if(schedule <= 50 && schedule >= 20) {
                 tradeChance = 1.0;
             } else if(g.phase === g.PHASE.FREE_AGENCY) {
-                tradeChance = 0.7;
+                tradeChance = 1.0;
             } else {
                 tradeChance = 0.0;
             }

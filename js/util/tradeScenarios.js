@@ -6,7 +6,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
     exprole = function(tx, tm1, teams) {
         console.log('Dealing expiring contracts');
         var pid, tm2, ft;
-        teams = teams;
 
         ft = teams.filter(function(o) {return o.isRebuilding; });
         tm2 = th.randomTeam(ft, tm1.tid);
@@ -22,9 +21,11 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
             .spread(function (players) {
                 console.debug(tm1, tm2);
 
+                console.log(players);
                 players = players.filter(
-                    th.andF(th.expThisSeason, th.atLeastFive, th.roleplayers, th.areVeterans, th.tradeable));
+                    th.andF(th.expThisSeason, th.atLeastFive, th.roleplayers, th.areVeterans));
 
+                console.log(players);
                 if (players.length === 0)
                     return false;
                 players = players.sort(th.oldestFirst);
@@ -233,19 +234,72 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
 
     // contending, offer pick(s) for role players with skills
     tradepick = function(tx, tm1, teams) {
-        console.log('trading pick for player with value');
-        return Promise.try(function() {return false; });
+        console.log('shopping pick for player with value');
+        var tm2 = th.randomTeam(teams, tm1.tid);
+        var year = g.phase <= g.PHASE.AFTER_DRAFT ? g.season : g.season + 1;
+
+        return Promise.all([
+                dao.draftPicks.getAll({
+                    ot: tx,
+                    index: "tid",
+                    key: tm1.tid
+                }),
+                dao.players.getAll({
+                    ot: tx,
+                    index: "tid",
+                    key: tm2.tid
+                }),
+            ])
+            .spread(function(picks, players) {
+                picks = picks.filter(function(o) { return o.season === year;});
+                if(picks.length === 0)
+                    return false;
+                var dpid = random.choice(picks).dpid;
+
+                if(players.length === 0)
+                    return false;
+                players = players.sort(th.highToLow);
+                players = players.slice(0, 3);
+                var pid = random.choice(players).pid;
+
+                var output = [];
+                output.push({ tid: tm1.tid, pids: [], dpids:[dpid,]});
+                output.push({ tid: tm2.tid, pids: [pid], dpids:[]});
+
+                return Promise.try(function() {return output; });
+            })
     };
 
     dumppick = function(tx, tm1, teams) {
         console.log('dumping pick for future');
-        return Promise.try(function() {return false; });
+
+        var tm2 = th.randomTeam(teams, tm1.tid);
+        var year = g.phase <= g.PHASE.AFTER_DRAFT ? g.season : g.season + 1;
+
+        return Promise.all([
+                dao.draftPicks.getAll({
+                    ot: tx,
+                    index: "tid",
+                    key: tm1.tid
+                })
+            ])
+            .spread(function(picks) {
+                picks = picks.filter(function(o) { return o.season === year;});
+                if(picks.length === 0)
+                    return false;
+                var dpid = random.choice(picks).dpid;
+
+                var output = [];
+                output.push({ tid: tm1.tid, pids: [], dpids:[dpid,]});
+                output.push({ tid: tm2.tid, pids: [], dpids:[]});
+
+                return Promise.try(function() {return output; });
+            })
     };
 
     freeforall = function(tx, tm1, teams) {
         console.log('Explore trades');
         var pid, tm2, ft;
-        teams = teams;
 
         tm2 = th.randomTeam(teams, tm1.tid);
 

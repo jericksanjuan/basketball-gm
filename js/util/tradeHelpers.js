@@ -56,7 +56,7 @@ define(["globals", "util/random"], function(g, random){
     };
 
     tradeable = function(o) {
-        return o.gamesUntilTradeable === 0;
+        return o.gamesUntilTradable === 0;
     }
 
     // sort
