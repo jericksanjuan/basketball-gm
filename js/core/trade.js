@@ -199,6 +199,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         })
         .then(function(teams) {
             tm1 = th.randomTeam(teams, g.userTid);
+            teams = teams.filter(th.notTid(tm1.tid));
             return genTradeScenarios(tm1, teams);
         })
         .error(function(e) {

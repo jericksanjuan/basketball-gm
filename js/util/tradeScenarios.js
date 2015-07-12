@@ -7,7 +7,9 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
         console.log('Dealing expiring contracts');
         var pid, tm2, ft;
 
-        ft = teams.filter(function(o) {return o.isRebuilding; });
+        ft = teams.filter(th.isRebuilding);
+        if(ft.length === 0)
+            return false;
         tm2 = th.randomTeam(ft, tm1.tid);
 
         return Promise.all(
@@ -47,11 +49,14 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
         var pid, tm2, ft;
 
         ft = teams.filter(th.andF(
-            function(o) {return o.isRebuilding; },
+            th.isRebuilding,
             function(o) {return o.hasSpaceForStart; }
         ));
         if (ft.length === 0) {
-            ft = teams.filter(function(o) { return o.isRebuilding; });
+            ft = teams.filter(th.isRebuilding);
+        }
+        if (ft.length === 0) {
+            return false;
         }
         tm2 = th.randomTeam(ft, tm1.tid);
 
@@ -90,11 +95,14 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
         var pid, tm2, ft;
 
         ft = teams.filter(th.andF(
-            function(o) {return o.isRebuilding; },
+            th.isRebuilding,
             function(o) {return o.hasSpaceForMax; }
         ));
         if (ft.length === 0) {
-            ft = teams.filter(function(o) { return o.isRebuilding; });
+            ft = teams.filter(th.isRebuilding);
+        }
+        if (ft.length === 0) {
+            return false;
         }
         tm2 = th.randomTeam(ft, tm1.tid);
 
@@ -130,12 +138,13 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
         console.log('trading for expiring deals');
         var pid, tm2, ft, pid2;
 
-        ft = teams.filter(th.andF(
-            function(o) {return o.hasSpaceForRole; }
-        ));
+        ft = teams.filter(function(o) {return o.hasSpaceForRole; });
         if (ft.length === 0) {
             ft = teams;
         }
+        if (ft.length === 0)
+            return false;
+
         tm2 = th.randomTeam(ft, tm1.tid);
 
         return Promise.all(
@@ -189,12 +198,11 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
 
         taxAmount = g.luxuryTax - tm1.payroll;
 
-        ft = teams.filter(th.andF(
-            function(o) {return o.hasSpaceForRole; }
-        ));
-        if (ft.length === 0) {
+        ft = teams.filter(function(o) {return o.hasSpaceForRole; });
+        if (ft.length === 0)
             ft = teams;
-        }
+        if (ft.length === 0)
+            return false;
         tm2 = th.randomTeam(ft, tm1.tid);
 
         return Promise.all(
@@ -235,6 +243,9 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
     // contending, offer pick(s) for role players with skills
     tradepick = function(tx, tm1, teams) {
         console.log('shopping pick for player with value');
+        if (teams.length === 0)
+            return false;
+
         var tm2 = th.randomTeam(teams, tm1.tid);
         var year = g.phase <= g.PHASE.AFTER_DRAFT ? g.season : g.season + 1;
 
@@ -273,6 +284,8 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
     dumppick = function(tx, tm1, teams) {
         console.log('dumping pick for future');
 
+        if (teams.length === 0)
+            return false;
         var tm2 = th.randomTeam(teams, tm1.tid);
         var year = g.phase <= g.PHASE.AFTER_DRAFT ? g.season : g.season + 1;
 
@@ -301,6 +314,8 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
         console.log('Explore trades');
         var pid, tm2, ft;
 
+        if (teams.length === 0)
+            return false;
         tm2 = th.randomTeam(teams, tm1.tid);
 
         return Promise.all(

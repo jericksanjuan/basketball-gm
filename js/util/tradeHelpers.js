@@ -3,7 +3,7 @@ define(["globals", "util/random"], function(g, random){
 
     var randomTeam, notF, andF, orF, expThisSeason, highToLow, areVeterans,
         starters, stars, roleplayers, atLeastFive, pids, dpids, tids,
-        getWs, getWLs, sumf, oldestFirst, costlyFirst, tradeable;
+        getWs, getWLs, sumf, oldestFirst, costlyFirst, tradeable, isRebuilding, isTid, notTid;
 
     randomTeam = function(teams, ban) {
         var selected = random.choice(teams);
@@ -57,12 +57,27 @@ define(["globals", "util/random"], function(g, random){
 
     tradeable = function(o) {
         return o.gamesUntilTradable === 0;
+    };
+
+    isRebuilding = function(o) {
+        return o.isRebuilding;
+    };
+
+    isTid = function(tid) {
+        return function(o) {
+            return o.tid === tid;
+        };
+    };
+
+    notTid = function(tid) {
+        return notF(isTid(tid));
     }
+
 
     // sort
     highToLow = function(a, b) { return b.value - a.value; };
     oldestFirst = function(a, b) { return a.born.year - b.born.year; };
-    costlyFirst = function(a, b) { return b.contract.amount - a.contract.amount };
+    costlyFirst = function(a, b) { return b.contract.amount - a.contract.amount; };
 
     // map
     pids = function(o) { return o.pid; };
@@ -72,7 +87,7 @@ define(["globals", "util/random"], function(g, random){
     getWLs = function(o) { return o.won + o.lost; };
 
     // reduce
-    sumf = function(a, b) { return a + b };
+    sumf = function(a, b) { return a + b; };
 
     return {
         randomTeam: randomTeam,
@@ -94,6 +109,9 @@ define(["globals", "util/random"], function(g, random){
         sumf: sumf,
         oldestFirst: oldestFirst,
         costlyFirst: costlyFirst,
-        tradeable: tradeable
+        tradeable: tradeable,
+        isRebuilding: isRebuilding,
+        isTid: isTid,
+        notTid, notTid
     };
 });
