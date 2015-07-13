@@ -92,7 +92,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         console.log(t);
 
         var possible = [];
-        if (g.phase == g.PHASE.FREE_AGENCY) {
+        if (g.phase === g.PHASE.FREE_AGENCY) {
             possible = ['freeforall'];
 
             if (t.isTaxPaying && !t.isFavorite ) {
@@ -140,7 +140,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                 }
             }
 
-            if (t.gp > 40) {
+            if (t.gp > 40 && g.phase < g.PHASE.PLAYOFFS) {
                 if (t.isPlayoff && t.winp > random.uniform(0.45, 0.75)) {  // use pick or expiring contracts to make deals for useful assets.
                     possible.push('dumppick');
                 }
