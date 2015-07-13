@@ -167,7 +167,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             freeforall: tscene.freeforall
         };
         var choice = random.choice(possible);
-        choice = 'freeforall';
         console.log("choice:", choice);
         return [outcomes[choice], tm1, teams, choice];
     }
@@ -197,7 +196,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         .then(function(teams) {
             var posTrades = [];
             var countTrades = tradeChance*2.5;
-            countTrades = 5;
 
             var createTrade = function() {
                 var results, tm1;
