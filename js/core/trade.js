@@ -167,13 +167,13 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             freeforall: tscene.freeforall
         };
         var choice = random.choice(possible);
+        choice = 'freeforall';
         console.log("choice:", choice);
         return [outcomes[choice], tm1, teams, choice];
     }
 
     function _createSimTrade(tradeChance) {
-        var tx, tm1, teams, executeScene, next;
-        teams = [];
+        var tx;
 
         if (Math.random() > tradeChance) {
             return;
@@ -197,10 +197,10 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         .then(function(teams) {
             var posTrades = [];
             var countTrades = tradeChance*2.5;
-            console.log('countTrade:', countTrades);
+            countTrades = 5;
 
             var createTrade = function() {
-                var results;
+                var results, tm1;
                 tm1 = th.randomTeam(teams, g.userTid);
                 teams = teams.filter(th.notTid(tm1.tid));
                 results = genTradeScenarios(tm1, teams);
@@ -214,7 +214,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         })
         .then(function(results_array) {
             var doTrade = function(tradeTeams) {
-                console.log('tradeTeams', tradeTeams);
 
                 if(!tradeTeams) {
                     console.log('Trade not found');
@@ -231,7 +230,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                             return;
                         }
 
-                        console.log(tradeTeams);
                         applyTrade(tradeTeams);
                     });
                 });
@@ -268,6 +266,8 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
 
     function applyTrade(teams) {
         var dpids, pids, tids, forceTrade;
+
+        console.log('teams', teams);
 
         tids = [teams[0].tid, teams[1].tid];
         pids = [teams[0].pids, teams[1].pids];
@@ -418,6 +418,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                     }
                 });
                 return tx.complete().then(function () {
+                    var league = require('core/league');
                     league.updateLastDbChange();
                 });
             });
@@ -866,7 +867,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
      * @return {Promise.[boolean, Object]} Resolves to an array with one or two elements. First is a boolean indicating whether "make it work" was successful. If true, then the second argument is set to a teams object (similar to first input) with the "made it work" trade info.
      */
     function makeItWork(teams, holdUserConstant, estValuesCached) {
-        var added, initialSign, testTrade, tryAddAsset;
+        var added, initialSign, testTrade, tryAddAsset, checkTeams;
 
         added = 0;
 
@@ -962,13 +963,13 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                     otherDpids = teams[1].dpids.slice();
 
                     if (asset.type === "player") {
-                        if (asset.tid === g.userTid) {
+                        if (asset.tid === teams[0].tid) {
                             userPids.push(asset.pid);
                         } else {
                             otherPids.push(asset.pid);
                         }
                     } else {
-                        if (asset.tid === g.userTid) {
+                        if (asset.tid === teams[0].tid) {
                             userDpids.push(asset.dpid);
                         } else {
                             otherDpids.push(asset.dpid);
@@ -993,13 +994,13 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                     }
                     asset = assets[j];
                     if (asset.type === "player") {
-                        if (asset.tid === g.userTid) {
+                        if (asset.tid === teams[0].tid) {
                             teams[0].pids.push(asset.pid);
                         } else {
                             teams[1].pids.push(asset.pid);
                         }
                     } else {
-                        if (asset.tid === g.userTid) {
+                        if (asset.tid === teams[0].tid) {
                             teams[0].dpids.push(asset.dpid);
                         } else {
                             teams[1].dpids.push(asset.dpid);
@@ -1013,14 +1014,24 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             });
         };
 
+        checkTeams = function() {
+            var success = true;
+            [0,1].forEach(function(i) {
+                if (teams[i].pid.length + teams[i].dpid.length < 0) {
+                    success = false;
+                }
+            });
+            return success;
+        };
+
         // See if the AI team likes the current trade. If not, try adding something to it.
         testTrade = function () {
             return team.valueChange(teams[1].tid, teams[0].pids, teams[1].pids, teams[0].dpids, teams[1].dpids, estValuesCached).then(function (dv) {
-                if (dv > 0 && initialSign === -1) {
+                if (dv > 0 && initialSign === -1 && checkTeams()) {
                     return [true, teams];
                 }
 
-                if ((added > 2 || (added > 0 && Math.random() > 0.5)) && initialSign === 1) {
+                if ((added > 2 || (added > 0 && Math.random() > 0.5)) && initialSign === 1 && checkTeams()) {
                     if (dv > 0) {
                         return [true, teams];
                     }

@@ -180,8 +180,10 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                     th.expThisSeason,
                     th.tradeable
                 ));
+                if (others.length === 0)
+                    return false;
                 others = others.sort(th.costlyFirst);
-                others = players.slice(0,3);
+                others = others.slice(0,3);
                 pid2 = random.choice(others).pid;
 
                 var output = [];
@@ -348,9 +350,21 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 console.log('selection', players);
                 pid = random.choice(players).pid;
 
-                var output = [];
-                output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
-                output.push({ tid: tm2.tid, pids: [], dpids:[]});
+                var mtids, mpids, mdpids;
+                var otherTid, otherPid, otherDpid;
+
+                mtids = tm1.tid;
+                otherTid = tm2.tid;
+                mpids = [pid, ];
+                otherPid = [];
+                mdpids = [];
+                otherDpid = [];
+
+                var output = [
+                    { tid: mtids, pids: mpids, dpids: mdpids},
+                    { tid: otherTid, pids: otherPid, dpids: otherDpid}
+                ]
+                console.log('BLANK', JSON.stringify(output));
 
                 return Promise.try(function() {return output; });
             });
