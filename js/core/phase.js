@@ -576,14 +576,18 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
     }
 
     function newPhaseFreeAgency(tx) {
-        var strategies;
+        var strategies, payrolls, hypes, cashes;
 
         return team.filter({
             ot: tx,
             attrs: ["strategy"],
+            seasonAttrs: ["payroll", "hype", "cash"],
             season: g.season
         }).then(function (teams) {
             strategies = _.pluck(teams, "strategy");
+            payrolls = _.pluck(teams, "payroll");
+            hypes = _.pluck(teams, "hype");
+            cashes = _.pluck(teams, "cash");
 
             // Delete all current negotiations to resign players
             return contractNegotiation.cancelAll(tx);
@@ -627,11 +631,11 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
 
 
                                 // Make it more likely for teams to resign starters and stars.
-                                if (p.value >= 65) {
+                                if (p.value >= 60) {
                                     factor -= 0.2;
                                 }
 
-                                if (p.value >= 75) {
+                                if (p.value >= 70) {
                                     factor -= 0.1;
                                 }
 
@@ -645,16 +649,35 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                                     factor += 0.2;
                                 }
 
+                                if (cashes[p.tid] > 0) {
+                                    factor -= 0.1;
+                                } else {
+                                    factor += 0.1;
+                                }
+
+                                if (hypes[p.tid] >= 0.5) {
+                                    factor -= 0.1;
+                                } else {
+                                    factor += 0.1;
+                                }
+
+
                                 if (Math.random() < p.value / 100 - factor) { // Should eventually be smarter than a coin flip
                                     // See also core.team
                                     contract = player.genContract(p);
                                     contract.exp += 1; // Otherwise contracts could expire this season
 
 
-                                    // TODO: Make contending teams more likely to go over cap than rebuilding teams, need payroll here.
-                                    // if (contract.amount + payroll > g.luxuryTax && Math.random() < 0.4 + factor) {
-                                    //     return player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods);
-                                    // }
+                                    if (contract.amount + payrolls[p.tid] > g.luxuryTax && Math.random() < factor) {
+                                        eventLog.add(null, {
+                                            type: "released",
+                                            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
+                                            showNotification: false,
+                                            pids: [p.pid],
+                                            tids: [p.tid, 29]
+                                        });
+                                        return player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods);
+                                    }
 
                                     p = player.setContract(p, contract, true);
                                     p.gamesUntilTradable = 15;
@@ -669,6 +692,14 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
 
                                     return p; // Other endpoints include calls to addToFreeAgents, which handles updating the database
                                 }
+
+                                eventLog.add(null, {
+                                    type: "released",
+                                    text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
+                                    showNotification: false,
+                                    pids: [p.pid],
+                                    tids: [p.tid, 29]
+                                });
 
                                 return player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods);
                             }
@@ -799,7 +830,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         return newPhaseResignPlayers(phaseChangeTx);
                     }
                     if (phase === g.PHASE.FREE_AGENCY) {
-                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "teams"], "readwrite");
+                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "teams", "releasedPlayers"], "readwrite");
                         return newPhaseFreeAgency(phaseChangeTx);
                     }
                     if (phase === g.PHASE.FANTASY_DRAFT) {
