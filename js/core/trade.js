@@ -175,9 +175,9 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         var tx, tm1, teams, executeScene, next;
         teams = [];
 
-        // if (Math.random() > tradeChance) {
-        //     return;
-        // }
+        if (Math.random() > tradeChance) {
+            return;
+        }
 
         if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS) {
             return;
@@ -194,46 +194,55 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             });
         })
         .map(mapFunc)
-        .error(function(e) {
-            console.error("error reading database.", e.message);
-        })
         .then(function(teams) {
-            tm1 = th.randomTeam(teams, g.userTid);
-            teams = teams.filter(th.notTid(tm1.tid));
-            return genTradeScenarios(tm1, teams);
-        })
-        .error(function(e) {
-            console.error("error reading database.", e.message);
-        })
-        .then(function(results) {
-            if (!results[0]) {
-                console.warn('no scenario');
-                return;
+            var posTrades = [];
+            var countTrades = tradeChance*2.5;
+            console.log('countTrade:', countTrades);
+
+            var createTrade = function() {
+                var results;
+                tm1 = th.randomTeam(teams, g.userTid);
+                teams = teams.filter(th.notTid(tm1.tid));
+                results = genTradeScenarios(tm1, teams);
+                return results[0](tx, results[1], results[2]);
+            };
+
+            for(var i=0; i<countTrades; i++) {
+                posTrades.push(createTrade());
             }
+            return Promise.all(posTrades);
+        })
+        .then(function(results_array) {
+            var doTrade = function(tradeTeams) {
+                console.log('tradeTeams', tradeTeams);
 
-            results[0](tx, results[1], results[2])
-                .then(function(tradeTeams) {
-                    if(!tradeTeams) {
-                        console.log('Trade not found');
-                        return;
-                    }
+                if(!tradeTeams) {
+                    console.log('Trade not found');
+                    return;
+                }
 
-                    return Promise.all([
-                        getPickValues(),
-                    ])
-                    .spread(function (estValues) {
-                        return makeItWork(tradeTeams, false, estValues).spread(function (found, tradeTeams) {
-                            if(!found) {
-                                console.log('Trade not found');
-                                return;
-                            }
+                return Promise.all([
+                    getPickValues(),
+                ])
+                .spread(function (estValues) {
+                    return makeItWork(tradeTeams, false, estValues).spread(function (found, tradeTeams) {
+                        if(!found) {
+                            console.log('Trade not found');
+                            return;
+                        }
 
-                            console.log(tradeTeams);
-                            applyTrade(tradeTeams, results[3]);
-                        });
+                        console.log(tradeTeams);
+                        applyTrade(tradeTeams);
                     });
-
                 });
+
+            };
+
+            for(var i=0; i<results_array.length; i++) {
+                var results = results_array[i];
+
+                doTrade(results);
+            }
         });
 
     }
@@ -244,10 +253,12 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             var  tradeChance;
             if (schedule > 50) {
                 tradeChance = 0.40;
-            } else if(schedule <= 50 && schedule >= 20) {
-                tradeChance = 1.0;
+            } else if(schedule <= 50 && schedule >= 22) {
+                tradeChance = 0.8;
+            } else if (schedule <= 22 && schedule >= 20) {
+                tradeChance = 6.0;
             } else if(g.phase === g.PHASE.FREE_AGENCY) {
-                tradeChance = 1.0;
+                tradeChance = 0.8;
             } else {
                 tradeChance = 0.0;
             }
@@ -255,7 +266,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         });
     }
 
-    function applyTrade(teams, reason) {
+    function applyTrade(teams) {
         var dpids, pids, tids, forceTrade;
 
         tids = [teams[0].tid, teams[1].tid];
@@ -353,7 +364,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                         return text;
                     };
                     var eventText = 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[0]], g.season]) + '">' + g.teamNamesCache[tids[0]] + '</a> traded ' + formatAssetsEventLog(s.teams[0]) + ' to the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[1]], g.season]) + '">' + g.teamNamesCache[tids[1]] + '</a> for ' + formatAssetsEventLog(s.teams[1]) + '.';
-                    eventText = eventText + ' ' + reason;
                     console.info(eventText);
                     eventLog.add(null, {
                         type: "trade",
