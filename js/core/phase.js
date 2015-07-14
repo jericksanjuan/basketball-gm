@@ -576,18 +576,19 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
     }
 
     function newPhaseFreeAgency(tx) {
-        var strategies, payrolls, hypes, cashes;
+        var strategies, payrolls, hypes, cashes, profits;
 
         return team.filter({
             ot: tx,
             attrs: ["strategy"],
-            seasonAttrs: ["payroll", "hype", "cash"],
+            seasonAttrs: ["payroll", "hype", "cash", "profit"],
             season: g.season
         }).then(function (teams) {
             strategies = _.pluck(teams, "strategy");
             payrolls = _.pluck(teams, "payroll");
             hypes = _.pluck(teams, "hype");
             cashes = _.pluck(teams, "cash");
+            profits = _.pluck(teams, "profit");
 
             // Delete all current negotiations to resign players
             return contractNegotiation.cancelAll(tx);
@@ -632,11 +633,11 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
 
                                 // Make it more likely for teams to resign starters and stars.
                                 if (p.value >= 60) {
-                                    factor -= 0.2;
+                                    factor -= 0.15;
                                 }
 
                                 if (p.value >= 70) {
-                                    factor -= 0.1;
+                                    factor -= 0.15;
                                 }
 
 
@@ -649,17 +650,16 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                                     factor += 0.2;
                                 }
 
-                                if (cashes[p.tid] > 0) {
+                                // Estimated cash (using current profit), avoid going negative.
+                                if ((cashes[p.tid] + profits[p.tid]) > 0) {
                                     factor -= 0.1;
                                 } else {
                                     factor += 0.1;
+                                    if (profits[p.tid] < 0)
+                                        factor += 0.1;
                                 }
 
-                                if (hypes[p.tid] >= 0.5) {
-                                    factor -= 0.1;
-                                } else {
-                                    factor += 0.1;
-                                }
+                                factor -= hypes[p.tid]/10;
 
 
                                 if (Math.random() < p.value / 100 - factor) { // Should eventually be smarter than a coin flip
@@ -667,7 +667,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                                     contract = player.genContract(p);
                                     contract.exp += 1; // Otherwise contracts could expire this season
 
-
+                                    // Random chance of not going over the luxury tax to keep player
                                     if (contract.amount + payrolls[p.tid] > g.luxuryTax && Math.random() < factor) {
                                         eventLog.add(null, {
                                             type: "released",
