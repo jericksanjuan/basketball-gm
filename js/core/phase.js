@@ -576,7 +576,17 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
     }
 
     function newPhaseFreeAgency(tx) {
-        var strategies, payrolls, hypes, cashes, profits;
+        var strategies, payrolls, hypes, cashes, profits, releasedEvent;
+
+        releasedEvent = function(p) {
+            eventLog.add(null, {
+                type: "released",
+                text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
+                showNotification: false,
+                pids: [p.pid],
+                tids: [p.tid]
+            });
+        };
 
         return team.filter({
             ot: tx,
@@ -615,40 +625,28 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                             if (p.contract.exp <= g.season && (g.userTids.indexOf(p.tid) < 0 || g.autoPlaySeasons > 0)) {
 
                                 // Automatically negotiate with teams
-                                if (strategies[p.tid] === "rebuilding") {
-                                    factor = 0.4;
-
-                                } else {
-                                    factor = 0;
-                                }
+                                factor = (strategies[p.tid] === "rebuilding") ? 0.4 : 0;
 
                                  // Get age
-                                if (p.draft.year > g.season) {
-                                    // Draft prospect
+                                if (p.draft.year > g.season)
                                     age = p.draft.year - p.born.year;
-                                } else {
+                                else
                                     age = g.season - p.born.year;
-                                }
-
 
                                 // Make it more likely for teams to resign starters and stars.
-                                if (p.value >= 60) {
+                                if (p.value >= 60)
                                     factor -= 0.15;
-                                }
 
-                                if (p.value >= 70) {
+                                if (p.value >= 70)
                                     factor -= 0.15;
-                                }
 
 
                                 // If rebuilding, less chance to keep older players.
-                                if (age >= 25 && age < 30) {
+                                if (age >= 25 && age < 30)
                                     factor += 0.1;
-                                }
 
-                                if (age > 30) {
+                                if (age > 30)
                                     factor += 0.2;
-                                }
 
                                 // Estimated cash (using current profit), avoid going negative.
                                 if ((cashes[p.tid] + profits[p.tid]) > 0) {
@@ -661,7 +659,6 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
 
                                 factor -= hypes[p.tid]/10;
 
-
                                 if (Math.random() < p.value / 100 - factor) { // Should eventually be smarter than a coin flip
                                     // See also core.team
                                     contract = player.genContract(p);
@@ -669,13 +666,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
 
                                     // Random chance of not going over the luxury tax to keep player
                                     if (contract.amount + payrolls[p.tid] > g.luxuryTax && Math.random() < factor) {
-                                        eventLog.add(null, {
-                                            type: "released",
-                                            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
-                                            showNotification: false,
-                                            pids: [p.pid],
-                                            tids: [p.tid, 29]
-                                        });
+                                        releasedEvent(p);
                                         return player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods);
                                     }
 
@@ -693,13 +684,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                                     return p; // Other endpoints include calls to addToFreeAgents, which handles updating the database
                                 }
 
-                                eventLog.add(null, {
-                                    type: "released",
-                                    text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
-                                    showNotification: false,
-                                    pids: [p.pid],
-                                    tids: [p.tid, 29]
-                                });
+                                releasedEvent(p);
 
                                 return player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods);
                             }
