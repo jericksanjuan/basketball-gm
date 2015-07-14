@@ -2,7 +2,7 @@
  * @name core.finances
  * @namespace Anything related to budget/finances.
  */
-define(["dao", "globals", "lib/underscore"], function (dao, g, _) {
+define(["dao", "globals", "lib/underscore", "core/team", "core/season"], function (dao, g, _, team, season) {
     "use strict";
 
     /**
@@ -155,9 +155,23 @@ define(["dao", "globals", "lib/underscore"], function (dao, g, _) {
         return (t.seasons[s][category][item].rank + 15.5 + 15.5) / 3;
     }
 
+    function runUpdateFinance() {
+        // Base occurrence on remaining days of season
+        return season.getDaysLeftSchedule().then(function (schedule) {
+            if (schedule % 10 === 0) {
+                return team.updateFinances();
+            }
+
+            if (g.phase === g.PHASE.PLAYOFFS) {
+                return team.updateFinances({attHike: 0.5});
+            }
+        });
+    }
+
     return {
         assessPayrollMinLuxury: assessPayrollMinLuxury,
         updateRanks: updateRanks,
-        getRankLastThree: getRankLastThree
+        getRankLastThree: getRankLastThree,
+        runUpdateFinance: runUpdateFinance
     };
 });

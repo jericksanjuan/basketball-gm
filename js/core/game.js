@@ -74,10 +74,10 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                     att = random.gauss(att, 1000);
                     att *= 30 / ticketPrice;  // Attendance depends on ticket price. Not sure if this formula is reasonable.
                     att *= 1 + 0.075 * (g.numTeams - finances.getRankLastThree(t, "expenses", "facilities")) / (g.numTeams - 1);  // Attendance depends on facilities. Not sure if this formula is reasonable.
-                    if (att > 25000) {
-                        att = 25000;
-                    } else if (att < 0) {
-                        att = 0;
+                    if (att > g.maxAttendance) {
+                        att = g.maxAttendance;
+                    } else if (att < g.minAttendance) {
+                        att = g.minAttendance;
                     }
                     att = Math.round(att);
                 }
@@ -611,11 +611,16 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
             ui.updateStatus("Idle");
             return league.setGameAttributesComplete({gamesInProgress: false}).then(function () {
                 return ui.updatePlayMenu(null);
-            }).then(function () {
+            })
+            .then(function () {
+
                 // Check to see if the season is over
                 if (g.phase < g.PHASE.PLAYOFFS) {
+
                     return season.getSchedule().then(function (schedule) {
                         if (schedule.length === 0) {
+                            team.updateFinances({poHike: 1.25});
+
                             // No return here, meaning no need to wait for phase.newPhase to resolve - is that correct?
                             phase.newPhase(g.PHASE.PLAYOFFS);
                             ui.updateStatus("Idle");  // Just to be sure..
@@ -655,7 +660,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                 }
 
                 // Update ranks
-                promises.push(finances.updateRanks(tx, ["expenses", "revenues"]));
+                promises.push(finances.updateRanks(tx, ["expenses", "revenues", "budget"]));
 
                 // Injury countdown - This must be after games are saved, of there is a race condition involving new injury assignment in writeStats
                 promises.push(dao.players.iterate({
@@ -732,6 +737,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                                 season.newSchedulePlayoffsDay(tx2).then(function (playoffsOver) {
                                     tx2.complete().then(function () {
                                         if (playoffsOver) {
+                                            team.updateFinances({poHike: 1/2});
                                             return phase.newPhase(g.PHASE.BEFORE_DRAFT);
                                         }
                                     }).then(function () {
@@ -819,6 +825,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
         // This simulates a day, including game simulation and any other bookkeeping that needs to be done
         cbRunDay = function () {
             if (numDays > 0) {
+                finances.runUpdateFinance();
                 // Hit the DB to check stopGames in case it came from another tab
                 return league.loadGameAttribute(null, "stopGames").then(function () {
                     // If we didn't just stop games, let's play

@@ -1333,12 +1333,128 @@ console.log(dv);*/
                     }
 
                     if (updated) {
+                        console.log('update strategy:', t.region, t.name);
                         return t;
                     }
                 });
             }
         });
     }
+
+
+    /**
+     * Update team budget allocation during the season.
+     *
+     * Adjust the ticket price depending on hype, win percentage and attendance.
+     * If the team makes the playoffs, maximize revenue by increasing ticketPrice.
+     *
+     * If team is rebuilding increase budget for scouting and facilities.
+     * If team is contending increase budget for coaching, health.
+     *
+     * If budget is low, decrease overall spending and ticket prices.
+     * If budget is high, increase overall spending.
+     *
+     * If team has many prospects increase coaching.
+     *
+     * @memberOf core.team
+     * @param {IDBTransaction} tx An IndexedDB transaction on players, playerStats, and teams, readwrite.
+     * @return {Promise}
+     */
+
+    function updateFinances(options) {
+
+        if (arguments[1] !== undefined) { throw new Error("No cb should be here"); }
+
+        options = options !== undefined ? options : {};
+
+        options.tx = options.tx !== undefined ? options.tx : dao.tx(["teams", "players", "releasedPlayers"], "readwrite");
+        options.poHike = options.poHike!== undefined ? options.poHike : 1;
+        options.attHike = options.attHike !== undefined ? options.attHike : 2;
+
+        var tx, poHike, attHike;
+        tx = options.tx;
+        poHike = options.poHike;
+        attHike = options.attHike;
+
+        console.log('adjusting finances');
+
+        return filter({
+            ot: tx,
+            attrs: ['tid'],
+            seasonAttrs: ['att', 'cash', 'profit'],
+            season: g.season
+        }).then(function(teams) {
+
+            return dao.teams.iterate({
+                ot: tx,
+                callback: function (t) {
+                    var info, adj, ticketPrice, minBudget, maxBudget, stratRatio, pdiff;
+
+                    stratRatio = {
+                        rebuilding: [1, 1, 0, 0.5],
+                        contending: [0, 0.5, 1, 1]
+                    };
+
+                    // Skip user's team
+                    if (t.tid === g.userTid) {
+                        return;
+                    }
+
+
+                    info = teams[t.tid];
+                    minBudget = (info.cash < 0) ? 4000 : 8000;
+                    maxBudget = (info.cash > 0) ? 22000 : 18000;
+                    adj = info.profit/8;
+
+                    ticketPrice = parseFloat(t.budget.ticketPrice.amount);
+                    console.log(t.region, 'before', ticketPrice);
+                    if (info.profit < 0) {
+                        if (info.att < g.maxAttendance*0.8) {
+                            ticketPrice = info.att * 30/g.maxAttendance;
+                        }
+                    }
+
+                    if (info.att >= g.maxAttendance*0.85) {
+                        ticketPrice += attHike;
+                    }
+
+                    ticketPrice *= poHike;
+
+                    t.budget.ticketPrice.amount = ticketPrice.toString();
+                    console.log(t.region, 'after', ticketPrice);
+
+                    if (info.profit <= 0) {
+                        pdiff = info.profit/4 * 1000;
+
+                        t.budget.scouting.amount = Math.max(t.budget.scouting.amount + pdiff, minBudget);
+                        t.budget.coaching.amount = Math.max(t.budget.coaching.amount + pdiff, minBudget);
+                        t.budget.health.amount = Math.max(t.budget.health.amount + pdiff, minBudget);
+                        t.budget.facilities.amount = Math.max(t.budget.facilities.amount + pdiff, minBudget);
+                    } else {
+                        pdidf = info.profit/8 * 1000;
+
+                        if(t.budget.scouting.rank != 1)
+                            t.budget.scouting.amount = Math.min(t.budget.scouting.amount + pdiff, maxBudget);
+                        if(t.budget.coaching.rank != 1)
+                            t.budget.coaching.amount = Math.min(t.budget.coaching.amount + pdiff, maxBudget);
+                        if(t.budget.health.rank != 1)
+                            t.budget.health.amount = Math.min(t.budget.health.amount + pdiff, maxBudget);
+                        if(t.budget.facilities.rank != 1)
+                            t.budget.facilities.amount = Math.min(t.budget.facilities.amount + pdiff, maxBudget);
+                    }
+
+                    console.log(t.region, 'other', JSON.stringify(t.budget));
+
+
+                    return dao.teams.put({ot: tx, value: t}).then(function () {
+                        return;
+                    });
+                }
+            });
+        });
+
+    }
+
 
     /**
      * Check roster size limits
@@ -1460,6 +1576,7 @@ console.log(dv);*/
         updateStrategies: updateStrategies,
         checkRosterSizes: checkRosterSizes,
         getPayroll: getPayroll,
-        getPayrolls: getPayrolls
+        getPayrolls: getPayrolls,
+        updateFinances: updateFinances
     };
 });
