@@ -1015,7 +1015,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         checkTeams = function() {
             var success = true;
             [0,1].forEach(function(i) {
-                if (teams[i].pid.length + teams[i].dpid.length < 0) {
+                if ((teams[i].pids.length + teams[i].dpids.length) === 0) {
                     success = false;
                 }
             });
