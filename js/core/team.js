@@ -1388,11 +1388,12 @@ console.log(dv);*/
             return dao.teams.iterate({
                 ot: tx,
                 callback: function (t) {
-                    var info, adj, ticketPrice, minBudget, maxBudget, stratRatio, pdiff;
+                    var info, adj, ticketPrice, minBudget, maxBudget, priorities,
+                        pdiff, priority, countApplied, i, j, s;
 
-                    stratRatio = {
-                        rebuilding: [1, 1, 0, 0.5],
-                        contending: [0, 0.5, 1, 1]
+                    priorities = {
+                        rebuilding: ['scouting', 'coaching', 'facilities', 'health'],
+                        contending: ['health', 'facilities', 'coaching', 'scouting']
                     };
 
                     // Skip user's team
@@ -1426,21 +1427,50 @@ console.log(dv);*/
                     if (info.profit <= 0) {
                         pdiff = info.profit/4 * 1000;
 
-                        t.budget.scouting.amount = Math.max(t.budget.scouting.amount + pdiff, minBudget);
-                        t.budget.coaching.amount = Math.max(t.budget.coaching.amount + pdiff, minBudget);
-                        t.budget.health.amount = Math.max(t.budget.health.amount + pdiff, minBudget);
-                        t.budget.facilities.amount = Math.max(t.budget.facilities.amount + pdiff, minBudget);
-                    } else {
-                        pdidf = info.profit/8 * 1000;
+                        priority = priorities[t.strategy].reverse();
+                        countApplied = 0;
 
-                        if(t.budget.scouting.rank != 1)
-                            t.budget.scouting.amount = Math.min(t.budget.scouting.amount + pdiff, maxBudget);
-                        if(t.budget.coaching.rank != 1)
-                            t.budget.coaching.amount = Math.min(t.budget.coaching.amount + pdiff, maxBudget);
-                        if(t.budget.health.rank != 1)
-                            t.budget.health.amount = Math.min(t.budget.health.amount + pdiff, maxBudget);
-                        if(t.budget.facilities.rank != 1)
-                            t.budget.facilities.amount = Math.min(t.budget.facilities.amount + pdiff, maxBudget);
+                        for (i=0, j=priority.length; i<j;) {
+                            s = priority[i];
+
+                            if (t.budget[s].amount === minBudget) {
+                                i++;
+                                continue;
+                            } else {
+                                t.budget[s].amount = Math.max(t.budget[s].amount + pdiff, minBudget);
+                                countApplied++;
+
+                                if (countApplied >= 4) {
+                                    i = j;
+                                    break;
+                                }
+                                continue;
+                            }
+                        }
+
+                    } else {
+                        pdiff = info.profit/8 * 1000;
+
+                        priority = priorities[t.strategy];
+                        countApplied = 0;
+
+                        for (i=0, j=priority.length; i<j;) {
+                            s = priority[i];
+
+                            if (t.budget[s].amount === maxBudget && t.budget[s].rank === 1) {
+                                i++;
+                                continue;
+                            } else {
+                                t.budget[s].amount = Math.min(t.budget[s].amount + pdiff, maxBudget);
+                                countApplied++;
+
+                                if (countApplied >= 4) {
+                                    i = j;
+                                    break;
+                                }
+                                continue;
+                            }
+                        }
                     }
 
                     console.log(t.region, 'other', JSON.stringify(t.budget));

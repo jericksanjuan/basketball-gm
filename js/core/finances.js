@@ -2,7 +2,7 @@
  * @name core.finances
  * @namespace Anything related to budget/finances.
  */
-define(["dao", "globals", "lib/underscore", "core/team", "core/season"], function (dao, g, _, team, season) {
+define(["dao", "globals", "lib/underscore"], function (dao, g, _) {
     "use strict";
 
     /**
@@ -155,7 +155,17 @@ define(["dao", "globals", "lib/underscore", "core/team", "core/season"], functio
         return (t.seasons[s][category][item].rank + 15.5 + 15.5) / 3;
     }
 
+    /**
+    * Run team.updateFinances every 10th day during the season and everyday during playoffs.
+    *
+    * Playoff ticket prices will increase by 0.5 everyday.
+    * It will also increase by 25% on the start of the playoffs and decrease by the half after the finals.
+    *
+    */
     function runUpdateFinance() {
+        var team, season;
+        team = require('core/team');
+        season = require('core/season');
         // Base occurrence on remaining days of season
         return season.getDaysLeftSchedule().then(function (schedule) {
             if (schedule % 10 === 0) {
