@@ -737,7 +737,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                                 season.newSchedulePlayoffsDay(tx2).then(function (playoffsOver) {
                                     tx2.complete().then(function () {
                                         if (playoffsOver) {
-                                            team.updateFinances({poHike: 1/2});
+                                            team.updateFinances({poHike: 1/2, reset: true });
                                             return phase.newPhase(g.PHASE.BEFORE_DRAFT);
                                         }
                                     }).then(function () {

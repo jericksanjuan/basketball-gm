@@ -1370,11 +1370,13 @@ console.log(dv);*/
         options.tx = options.tx !== undefined ? options.tx : dao.tx(["teams", "players", "releasedPlayers"], "readwrite");
         options.poHike = options.poHike!== undefined ? options.poHike : 1;
         options.attHike = options.attHike !== undefined ? options.attHike : 2;
+        options.reset = options.reset !== undefined ? options.reset : false;
 
-        var tx, poHike, attHike;
+        var tx, poHike, attHike, reset;
         tx = options.tx;
         poHike = options.poHike;
         attHike = options.attHike;
+        reset = options.reset;
 
         console.log('adjusting finances');
 
@@ -1389,12 +1391,14 @@ console.log(dv);*/
                 ot: tx,
                 callback: function (t) {
                     var info, adj, ticketPrice, minBudget, maxBudget, priorities,
-                        pdiff, priority, countApplied, i, j, s;
+                        pdiff, priority, countApplied, countTarget, i, j, s;
 
                     priorities = {
                         rebuilding: ['scouting', 'coaching', 'facilities', 'health'],
                         contending: ['health', 'facilities', 'coaching', 'scouting']
                     };
+
+                    countTarget = random.randInt(2, 4);
 
                     // Skip user's team
                     if (t.tid === g.userTid) {
@@ -1422,56 +1426,67 @@ console.log(dv);*/
                     ticketPrice *= poHike;
 
                     t.budget.ticketPrice.amount = ticketPrice.toString();
+
                     console.log(t.region, 'after', ticketPrice);
 
-                    if (info.profit <= 0) {
-                        pdiff = info.profit/4 * 1000;
-
-                        priority = priorities[t.strategy].reverse();
-                        countApplied = 0;
-
-                        for (i=0, j=priority.length; i<j;) {
-                            s = priority[i];
-
-                            if (t.budget[s].amount === minBudget) {
-                                i++;
-                                continue;
-                            } else {
-                                t.budget[s].amount = Math.max(t.budget[s].amount + pdiff, minBudget);
-                                countApplied++;
-
-                                if (countApplied >= 4) {
-                                    i = j;
-                                    break;
-                                }
-                                continue;
-                            }
-                        }
-
-                    } else {
-                        pdiff = info.profit/8 * 1000;
-
+                    if (reset) {
+                        console.log('reset');
                         priority = priorities[t.strategy];
-                        countApplied = 0;
-
-                        for (i=0, j=priority.length; i<j;) {
+                        for(i=0; i<priority.length; i++) {
                             s = priority[i];
+                            t.budget[s].amount = (13 + (3-i)) * 1000;
+                        };
+                    } else {
+                        if (info.profit <= 0) {
+                            pdiff = info.profit/4 * 1000;
 
-                            if (t.budget[s].amount === maxBudget && t.budget[s].rank === 1) {
-                                i++;
-                                continue;
-                            } else {
-                                t.budget[s].amount = Math.min(t.budget[s].amount + pdiff, maxBudget);
-                                countApplied++;
+                            priority = priorities[t.strategy].reverse();
+                            countApplied = 0;
 
-                                if (countApplied >= 4) {
-                                    i = j;
-                                    break;
+                            for (i=0, j=priority.length; i<j;) {
+                                s = priority[i];
+
+                                if (t.budget[s].amount === minBudget) {
+                                    i++;
+                                    continue;
+                                } else {
+                                    t.budget[s].amount = Math.max(t.budget[s].amount + pdiff, minBudget);
+                                    countApplied++;
+
+                                    if (countApplied >= countTarget) {
+                                        i = j;
+                                        break;
+                                    }
+                                    continue;
                                 }
-                                continue;
+                            }
+
+                        } else {
+                            pdiff = info.profit/8 * 1000;
+
+                            priority = priorities[t.strategy];
+                            countApplied = 0;
+
+                            for (i=0, j=priority.length; i<j;) {
+                                s = priority[i];
+
+                                if (t.budget[s].amount === maxBudget && t.budget[s].rank === 1) {
+                                    i++;
+                                    continue;
+                                } else {
+                                    t.budget[s].amount = Math.min(t.budget[s].amount + pdiff, maxBudget);
+                                    countApplied++;
+
+                                    if (countApplied >= countTarget) {
+                                        i = j;
+                                        break;
+                                    }
+                                    continue;
+                                }
                             }
                         }
                     }
+
 
                     console.log(t.region, 'other', JSON.stringify(t.budget));
 

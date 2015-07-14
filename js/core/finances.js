@@ -168,13 +168,18 @@ define(["dao", "globals", "lib/underscore"], function (dao, g, _) {
         season = require('core/season');
         // Base occurrence on remaining days of season
         return season.getDaysLeftSchedule().then(function (schedule) {
+            if (g.phase === g.PHASE.PLAYOFFS) {
+                return team.updateFinances({attHike: 0.5});
+            }
+
+            if (g.phase > g.PHASE.PLAYOFFS) {
+                return;
+            }
+
             if (schedule % 10 === 0) {
                 return team.updateFinances();
             }
 
-            if (g.phase === g.PHASE.PLAYOFFS) {
-                return team.updateFinances({attHike: 0.5});
-            }
         });
     }
 
