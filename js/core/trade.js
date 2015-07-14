@@ -217,6 +217,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                     console.log('Trade not found');
                     return;
                 }
+                var reason = tradeTeams[0].scene;
 
                 return Promise.all([
                     getPickValues(),
@@ -228,7 +229,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                             return;
                         }
 
-                        applyTrade(tradeTeams);
+                        applyTrade(tradeTeams, reason);
                     });
                 });
 
@@ -262,7 +263,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         });
     }
 
-    function applyTrade(teams) {
+    function applyTrade(teams, reason) {
         var dpids, pids, tids, forceTrade;
 
         console.log('teams', teams);
@@ -362,6 +363,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                         return text;
                     };
                     var eventText = 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[0]], g.season]) + '">' + g.teamNamesCache[tids[0]] + '</a> traded ' + formatAssetsEventLog(s.teams[0]) + ' to the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[1]], g.season]) + '">' + g.teamNamesCache[tids[1]] + '</a> for ' + formatAssetsEventLog(s.teams[1]) + '.';
+                    eventText += ' [' + reason +']';
                     console.info(eventText);
                     eventLog.add(null, {
                         type: "trade",

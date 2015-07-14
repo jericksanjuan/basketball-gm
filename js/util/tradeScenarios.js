@@ -36,7 +36,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 pid = random.choice(players).pid;
 
                 var output = [];
-                output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
+                output.push({ tid: tm1.tid, pids: [pid,], dpids:[], scene: "exprole"});
                 output.push({ tid: tm2.tid, pids: [], dpids:[]});
 
                 return Promise.try(function() {return output; });
@@ -82,7 +82,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 pid = random.choice(players).pid;
 
                 var output = [];
-                output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
+                output.push({ tid: tm1.tid, pids: [pid,], dpids:[], scene: "expstarter"});
                 output.push({ tid: tm2.tid, pids: [], dpids:[]});
 
                 return Promise.try(function() {return output; });
@@ -126,7 +126,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 pid = random.choice(players).pid;
 
                 var output = [];
-                output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
+                output.push({ tid: tm1.tid, pids: [pid,], dpids:[], scene: "disgruntled"});
                 output.push({ tid: tm2.tid, pids: [], dpids:[]});
 
                 return Promise.try(function() {return output; });
@@ -187,7 +187,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 pid2 = random.choice(others).pid;
 
                 var output = [];
-                output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
+                output.push({ tid: tm1.tid, pids: [pid,], dpids:[], scene: "freespace"});
                 output.push({ tid: tm2.tid, pids: [pid2,], dpids:[]});
 
                 return Promise.try(function() {return output; });
@@ -235,7 +235,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 pid = random.choice(players).pid;
 
                 var output = [];
-                output.push({ tid: tm1.tid, pids: [pid,], dpids:[]});
+                output.push({ tid: tm1.tid, pids: [pid,], dpids:[], scene: "lesstax"});
                 output.push({ tid: tm2.tid, pids: [], dpids:[]});
 
                 return Promise.try(function() {return output; });
@@ -276,7 +276,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 var pid = random.choice(players).pid;
 
                 var output = [];
-                output.push({ tid: tm1.tid, pids: [], dpids:[dpid,]});
+                output.push({ tid: tm1.tid, pids: [], dpids:[dpid,], scene: "tradepick"});
                 output.push({ tid: tm2.tid, pids: [pid], dpids:[]});
 
                 return Promise.try(function() {return output; });
@@ -305,7 +305,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 var dpid = random.choice(picks).dpid;
 
                 var output = [];
-                output.push({ tid: tm1.tid, pids: [], dpids:[dpid,]});
+                output.push({ tid: tm1.tid, pids: [], dpids:[dpid,], scene: "dumppick"});
                 output.push({ tid: tm2.tid, pids: [], dpids:[]});
 
                 return Promise.try(function() {return output; });
@@ -361,7 +361,7 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 otherDpid = [];
 
                 var output = [
-                    { tid: mtids, pids: mpids, dpids: mdpids},
+                    { tid: mtids, pids: mpids, dpids: mdpids, scene: "freeforall"},
                     { tid: otherTid, pids: otherPid, dpids: otherDpid}
                 ]
                 console.log('BLANK', JSON.stringify(output));
