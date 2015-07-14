@@ -1407,8 +1407,11 @@ console.log(dv);*/
 
 
                     info = teams[t.tid];
+                    console.log('cash', info.cash);
                     minBudget = (info.cash < 0) ? 4000 : 8000;
-                    maxBudget = (info.cash > 0) ? 22000 : 18000;
+                    maxBudget = (info.cash > 110) ?  22000 : 18000;
+                    maxBudget = (info.cash > 150) ? 30000 : maxBudget;
+                    maxBudget = (info.cash > 300) ? 100000 : maxBudget;
                     adj = info.profit/8;
 
                     ticketPrice = parseFloat(t.budget.ticketPrice.amount);
@@ -1435,7 +1438,7 @@ console.log(dv);*/
                         for(i=0; i<priority.length; i++) {
                             s = priority[i];
                             t.budget[s].amount = (13 + (3-i)) * 1000;
-                        };
+                        }
                     } else {
                         if (info.profit <= 0) {
                             pdiff = info.profit/4 * 1000;
@@ -1470,7 +1473,7 @@ console.log(dv);*/
                             for (i=0, j=priority.length; i<j;) {
                                 s = priority[i];
 
-                                if (t.budget[s].amount === maxBudget && t.budget[s].rank === 1) {
+                                if (t.budget[s].amount === maxBudget || t.budget[s].rank === 1) {
                                     i++;
                                     continue;
                                 } else {
