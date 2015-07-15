@@ -518,6 +518,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         options.totals = options.totals !== undefined ? options.totals : false;
         options.playoffs = options.playoffs !== undefined ? options.playoffs : false;
         options.sortBy = options.sortBy !== undefined ? options.sortBy : "";
+        options.getTeam = options.getTeam !== undefined ? options.getTeam : false;
 
         // Copys/filters the attributes listed in options.attrs from p to fp.
         filterAttrs = function (ft, t, options) {
@@ -721,6 +722,8 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                 filterAttrs(ft, t[i], options);
                 filterSeasonAttrs(ft, t[i], options);
                 filterStats(ft, t[i], options);
+                if (options.getTeam)
+                    ft.team = t[i];
                 fts.push(ft);
             }
 

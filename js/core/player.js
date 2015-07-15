@@ -181,7 +181,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         }
 
         if (age > 30 && ratings.pot >= 60) {
-            years = 3  // override 5 years
+            years = 3;  // override 5 years
         }
 
 
@@ -1642,7 +1642,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
                     current = current * (ps1.min + ps2.min) / 2000 + pr.ovr * (1 - (ps1.min + ps2.min) / 2000);
                 }
             }
-            current = 0.1 * pr.ovr + 0.9 * current; // Include some part of the ratings
+            current = 0.3 * pr.ovr + 0.7 * current; // Include some part of the ratings
         }
 
         // Short circuit if we don't care about potential
@@ -1658,45 +1658,82 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
             return current;
         }
 
-        // Otherwise, combine based on age
-        if (p.draft.year > g.season) {
-            // Draft prospect
-            age = p.draft.year - p.born.year;
+        age = (p.draft.year > g.season) ? p.draft.year - p.born.year : g.season - p.born.year;
+
+
+        return getValueWithPotential(age, potential, current);
+
+    }
+
+    var POT_CURRENT = {
+        19: [0.8, 0.2],
+        20: [0.7, 0.2],
+        21: [0.5, 0.5],
+        22: [0.3, 0.7],
+        23: [0.15, 0.85],
+        24: [0.1, 0.9],
+        25: [0.05, 0.95],
+        26: [0, 1],
+        27: [0, 1],
+        28: [0, 1],
+        29: [0, 0.975],
+    };
+
+    function ageFactor(age) {
+        var ageDiff;
+        ageDiff = age - 28;
+        return 1 - 0.03 * ageDiff;
+
+    }
+    function getValueWithPotential(age, potential, current) {
+        if (age < 19)
+            age = 19;
+
+        if (age <= 29) {
+            var match = POT_CURRENT[age];
+            return match[0] * potential + match[1] * current;
         } else {
-            age = g.season - p.born.year;
+            return ageFactor(age) * current;
         }
-        if (age <= 19) {
-            return 0.8 * potential + 0.2 * current;
+
+    }
+
+    function getCurrentWithValue(age, value, potential, ovr) {
+        var currentTemp;
+        if (age < 19)
+            age = 19;
+        if (age <= 29) {
+            var match =  POT_CURRENT[age];
+            currentTemp = (value - potential * match[0]) * (1/match[1]);
+        } else {
+            currentTemp = (1/ageFactor(age)) * value;
         }
-        if (age === 20) {
-            return 0.7 * potential + 0.3 * current;
-        }
-        if (age === 21) {
-            return 0.5 * potential + 0.5 * current;
-        }
-        if (age === 22) {
-            return 0.3 * potential + 0.7 * current;
-        }
-        if (age === 23) {
-            return 0.15 * potential + 0.85 * current;
-        }
-        if (age === 24) {
-            return 0.1 * potential + 0.9 * current;
-        }
-        if (age === 25) {
-            return 0.05 * potential + 0.95 * current;
-        }
-        if (age > 25 && age < 29) {
-            return current;
-        }
-        if (age === 29) {
-            return 0.975 * current;
-        }
-        if (age >= 30) {
-            ageDiff = age - 28;
-            var ageFactor = 1-0.03*ageDiff
-            return ageFactor * current;
-        }
+
+        return (currentTemp - 0.3 * ovr) * 1/0.7;
+    }
+
+
+    /**
+    * Reverse engineer the value of current to apply own fuzz.
+    */
+    function cpuValue(p, scoutingRank) {
+        var current, age, ratings, fuzz, ovrF, potF, currentTemp;
+
+        age = (p.draft.year > g.season) ? p.draft.year - p.born.year : g.season - p.born.year;
+
+        ratings = p.ratings[p.ratings.length -1];
+        current = getCurrentWithValue(age, p.value, ratings.pot, ratings.ovr );
+        console.log('current', current);
+
+        fuzz = genFuzz(scoutingRank);
+        console.log(fuzz);
+        ovrF = fuzzRating(ratings.ovr, fuzz);
+        potF = fuzzRating(ratings.pot, fuzz);
+        console.log(ovrF, potF);
+
+        currentTemp = 0.3 * ovrF + 0.7 * current;
+        console.log('currentTemp', currentTemp);
+        return getValueWithPotential(age, potF, currentTemp);
     }
 
     // ps: player stats objects, regular season only, most recent first
@@ -2112,6 +2149,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         moodColorText: moodColorText,
         augmentPartialPlayer: augmentPartialPlayer,
         checkStatisticalFeat: checkStatisticalFeat,
-        killOne: killOne
+        killOne: killOne,
+        cpuValue, cpuValue
     };
 });

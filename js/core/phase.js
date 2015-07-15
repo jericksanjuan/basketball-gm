@@ -592,13 +592,15 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             ot: tx,
             attrs: ["strategy"],
             seasonAttrs: ["payroll", "hype", "cash", "profit"],
-            season: g.season
+            season: g.season,
+            getTeam: true
         }).then(function (teams) {
             strategies = _.pluck(teams, "strategy");
             payrolls = _.pluck(teams, "payroll");
             hypes = _.pluck(teams, "hype");
             cashes = _.pluck(teams, "cash");
             profits = _.pluck(teams, "profit");
+            tms = _.pluck(teams, "team");
 
             // Delete all current negotiations to resign players
             return contractNegotiation.cancelAll(tx);
@@ -620,7 +622,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         index: "tid",
                         key: IDBKeyRange.lowerBound(0),
                         callback: function (p) {
-                            var contract, factor, age, payroll;
+                            var contract, factor, age, payroll, scoutingRank, fuzz, fuzzValue;
 
                             if (p.contract.exp <= g.season && (g.userTids.indexOf(p.tid) < 0 || g.autoPlaySeasons > 0)) {
 
@@ -632,6 +634,11 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                                     age = p.draft.year - p.born.year;
                                 else
                                     age = g.season - p.born.year;
+
+                                // Add fuzz
+                                // scoutingRank = finances.getRankLastThree(tms[p.tid], "expenses", "scouting");
+
+
 
                                 // Make it more likely for teams to resign starters and stars.
                                 if (p.value >= 60)
