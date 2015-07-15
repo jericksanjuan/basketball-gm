@@ -43,6 +43,11 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/knockout", "util/bbgmView",
                         }
                     });
 
+                    // Filter by type
+                    events = events.filter(function (event) {
+                        return event.type === 'reSigned' || event.type === 'released' || event.type === 'trade';
+                    });
+
                     return {
                         abbrev: inputs.abbrev,
                         events: events,
@@ -85,7 +90,7 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/knockout", "util/bbgmView",
 
     function uiFirst(vm) {
         ko.computed(function () {
-            ui.title("Event Log - " + vm.season());
+            ui.title("Transactions - " + vm.season());
         }).extend({throttle: 1});
     }
 
@@ -94,7 +99,7 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/knockout", "util/bbgmView",
     }
 
     return bbgmView.init({
-        id: "eventLog",
+        id: "teamTransaction",
         get: get,
         InitViewModel: InitViewModel,
         runBefore: [updateEventLog],
