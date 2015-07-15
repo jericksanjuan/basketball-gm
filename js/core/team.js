@@ -1378,8 +1378,6 @@ console.log(dv);*/
         attHike = options.attHike;
         reset = options.reset;
 
-        console.log('adjusting finances');
-
         return filter({
             ot: tx,
             attrs: ['tid'],
@@ -1407,7 +1405,6 @@ console.log(dv);*/
 
 
                     info = teams[t.tid];
-                    console.log('cash', info.cash);
                     minBudget = (info.cash < 0) ? 4000 : 8000;
                     maxBudget = (info.cash > 110) ?  22000 : 18000;
                     maxBudget = (info.cash > 150) ? 30000 : maxBudget;
@@ -1415,7 +1412,6 @@ console.log(dv);*/
                     adj = info.profit/8;
 
                     ticketPrice = parseFloat(t.budget.ticketPrice.amount);
-                    console.log(t.region, 'before', ticketPrice);
                     if (info.profit < 0) {
                         if (info.att < g.maxAttendance*0.8) {
                             ticketPrice = info.att * 30/g.maxAttendance;
@@ -1430,10 +1426,8 @@ console.log(dv);*/
 
                     t.budget.ticketPrice.amount = ticketPrice.toString();
 
-                    console.log(t.region, 'after', ticketPrice);
 
                     if (reset) {
-                        console.log('reset');
                         priority = priorities[t.strategy];
                         for(i=0; i<priority.length; i++) {
                             s = priority[i];
@@ -1489,10 +1483,6 @@ console.log(dv);*/
                             }
                         }
                     }
-
-
-                    console.log(t.region, 'other', JSON.stringify(t.budget));
-
 
                     return dao.teams.put({ot: tx, value: t}).then(function () {
                         return;
