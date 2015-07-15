@@ -129,7 +129,15 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "util/helpers"], function
                             key: "all"
                         },
                         {
-                            val: "Resign",
+                            val: "Draft",
+                            key: "draft",
+                        },
+                        {
+                            val: "FA Signed",
+                            key: "freeAgent"
+                        },
+                        {
+                            val: "Resigned",
                             key:  "reSigned"
                         },
                         {
