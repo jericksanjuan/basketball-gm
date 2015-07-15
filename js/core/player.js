@@ -150,7 +150,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         // Scale proportional to (ovr*2 + pot)*0.5 120-210
         //amount = ((3 * p.value) * 0.85 - 110) / (210 - 120);  // Scale from 0 to 1 (approx)
         //amount = amount * (maxAmount - minAmount) + minAmount;
-        amount = ((p.value - 1) / 100 - 0.45) * 3.3 * (maxAmount - minAmount) + minAmount;
+        amount = ((p.value - 1) / 100 - 0.47) * 3.3 * (maxAmount - minAmount) + minAmount;
         if (randomizeAmount) {
             amount *= helpers.bound(random.realGauss(1, 0.1), 0, 2);  // Randomize
         }
@@ -172,13 +172,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         }
 
 
-        // Old players should only ask for short deals
-        if (p.draft.year > g.season) {
-            // Draft prospect
-            age = p.draft.year - p.born.year;
-        } else {
-            age = g.season - p.born.year;
-        }
+        age = (p.draft.year > g.season) ? p.draft.year - p.born.year : g.season - p.born.year;
 
         if (age > 30 && ratings.pot >= 60) {
             years = 3;  // override 5 years
@@ -1642,7 +1636,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
                     current = current * (ps1.min + ps2.min) / 2000 + pr.ovr * (1 - (ps1.min + ps2.min) / 2000);
                 }
             }
-            current = 0.3 * pr.ovr + 0.7 * current; // Include some part of the ratings
+            current = 0.1 * pr.ovr + 0.9 * current; // Include some part of the ratings
         }
 
         // Short circuit if we don't care about potential
@@ -1667,7 +1661,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
 
     var POT_CURRENT = {
         19: [0.8, 0.2],
-        20: [0.7, 0.2],
+        20: [0.7, 0.3],
         21: [0.5, 0.5],
         22: [0.3, 0.7],
         23: [0.15, 0.85],

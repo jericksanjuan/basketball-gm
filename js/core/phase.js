@@ -643,7 +643,6 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                                 // Add fuzz
                                 scoutingRank = finances.getRankLastThree(tms[p.tid], "expenses", "scouting");
                                 fuzzValue = player.cpuValue(p, fuzzes[p.tid]);
-                                console.log('scoutingRank', scoutingRank, 'pvalue', p.value, 'fuzzValue', fuzzValue);
 
 
                                 // Make it more likely for teams to resign starters and stars.

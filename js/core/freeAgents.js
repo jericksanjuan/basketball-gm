@@ -2,7 +2,7 @@
  * @name core.freeAgents
  * @namespace Functions related to free agents that didn't make sense to put anywhere else.
  */
-define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, Promise, _, eventLog, helpers, lock, random) {
+define(["dao", "globals", "ui", "core/player", "core/team", "core/finances", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, finances, Promise, _, eventLog, helpers, lock, random) {
     "use strict";
 
     /**
@@ -20,7 +20,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             team.filter({
                 ot: tx,
                 attrs: ["strategy"],
-                season: g.season
+                season: g.season,
+                getTeam: true
             }),
             dao.players.getAll({
                 ot: tx,
@@ -28,9 +29,14 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 key: g.PLAYER.FREE_AGENT
             })
         ]).spread(function (teams, players) {
-            var i, strategies, tids;
+            var i, strategies, tids, tms, fuzzes;
 
             strategies = _.pluck(teams, "strategy");
+            tms = _.pluck(teams, "team");
+            fuzzes = tms.map(function(tm) {
+                var scoutingRank = finances.getRankLastThree(tm, "expenses",  "scouting");
+                return player.genFuzz(scoutingRank);
+            });
 
             // List of free agents, sorted by value
             players.sort(function (a, b) { return b.value - a.value; });
@@ -55,20 +61,17 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 if (strategies[tid] === "rebuilding") {
                     // Prioritize younger high valued free agents
                     players.sort(function (a, b) {
-                        var x = b.value - a.value;
+                        var x = player.cpuValue(b, fuzzes[tid]) - player.cpuValue(a, fuzzes[tid]);
+                        // var x = b.value - a.value;
                         return x === 0? a.born.year - b.born.year: x;
                     });
                 } else {
                     // For contending teams, prioritize high valued veterans
                     players.sort(function (a, b) {
-                        var x = b.value - a.value;
+                        var x = player.cpuValue(b, fuzzes[tid]) - player.cpuValue(a, fuzzes[tid]);
+                        // var x = b.value - a.value;
                         return x === 0? b.born.year - a.born.year: x;
                     });
-                }
-
-                // Small chance of actually trying to sign someone in free agency, gets greater as time goes on
-                if (g.phase === g.PHASE.FREE_AGENCY && Math.random() < 0.99 * g.daysLeft / 30) {
-                    return;
                 }
 
                 // Skip rebuilding teams sometimes
@@ -90,36 +93,47 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     }),
                     team.getPayroll(tx, tid).get(0)
                 ]).spread(function (numPlayersOnRoster, payroll) {
-                    var i, p;
+                    var i, p, fplayers, capSpace;
+
+                    capSpace = Math.max(g.salaryCap - payroll, g.minContract);
+                    fplayers = players.filter(function(p) { return p.contract.amount <= capSpace; });
+
+                    // Small chance of actually trying to sign someone in free agency, gets greater as time goes on
+                    if (g.phase === g.PHASE.FREE_AGENCY && Math.random() < 0.99 * g.daysLeft / 30) {
+                        return;
+                    }
 
                     if (numPlayersOnRoster < 15) {
                         var output = function  () {
                             return team.rosterAutoSort(tx, tid);
-                        }
-                        for (i = 0; i < players.length; i++) {
+                        };
+                        for (i = 0; i < fplayers.length; i++) {
                             // Don't sign minimum contract players to fill out the roster
-                            if (players[i].contract.amount + payroll <= g.salaryCap || (players[i].contract.amount === g.minContract && numPlayersOnRoster < 13)) {
-                                p = players[i];
-                                p.tid = tid;
-                                if (g.phase <= g.PHASE.PLAYOFFS) { // Otherwise, not needed until next season
-                                    p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
-                                }
-                                p = player.setContract(p, p.contract, true);
-                                p.gamesUntilTradable = 15;
-
-                                eventLog.add(null, {
-                                    type: "freeAgent",
-                                    text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
-                                    showNotification: false,
-                                    pids: [p.pid],
-                                    tids: [p.tid]
-                                });
-
-                                players.splice(i, 1); // Remove from list of free agents
-
-                                // If we found one, stop looking for this team
-                                return dao.players.put({ot: tx, value: p}).then(output);
+                            if (fplayers[i].contract.amount === g.minContract && numPlayersOnRoster > 12) {
+                                continue;
                             }
+                            p = fplayers[i];
+                            p.tid = tid;
+                            if (g.phase <= g.PHASE.PLAYOFFS) { // Otherwise, not needed until next season
+                                p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
+                            }
+                            p = player.setContract(p, p.contract, true);
+                            p.gamesUntilTradable = 15;
+
+                            eventLog.add(null, {
+                                type: "freeAgent",
+                                text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
+                                showNotification: false,
+                                pids: [p.pid],
+                                tids: [p.tid]
+                            });
+
+                            players = players.filter(function(o) {return o.pid != p.pid});
+                            // players.splice(i, 1); // Remove from list of free agents
+
+                            // If we found one, stop looking for this team
+                            return dao.players.put({ot: tx, value: p}).then(output);
+
                         }
                     }
                 });
