@@ -1333,7 +1333,6 @@ console.log(dv);*/
                     }
 
                     if (updated) {
-                        console.log('update strategy:', t.region, t.name);
                         return t;
                     }
                 });
