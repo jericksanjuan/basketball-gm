@@ -7,20 +7,22 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/knockout", "util/bbgmView",
 
     function get(req) {
         return {
+            eventType: req.params.eventType,
             season: helpers.validateSeason(req.params.season)
         };
     }
 
     function InitViewModel() {
         this.season = ko.observable();
+        this.eventType = ko.observable();
         this.events = ko.observableArray([]);
     }
 
     function updateEventLog(inputs, updateEvents, vm) {
         var maxEid, newEvents;
 
-        if (updateEvents.length >= 0 || inputs.season !== vm.season()) {
-            if (inputs.season !== vm.season() ) {
+        if (updateEvents.length >= 0 || inputs.season !== vm.season() || inputs.eventType !== vm.eventType ) {
+            if (inputs.season !== vm.season() || inputs.eventType !== vm.eventType ) {
                 vm.events([]);
             }
 
@@ -30,13 +32,21 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/knockout", "util/bbgmView",
                     events.reverse(); // Newest first
 
                     // Filter by type
-                    events = events.filter(function (event) {
-                        return event.type === 'reSigned' || event.type === 'released' || event.type === 'trade';
-                    });
+                    console.log(inputs.eventType);
+                    if (inputs.eventType === "all") {
+                        events = events.filter(function (event) {
+                            return event.type === 'reSigned' || event.type === 'released' || event.type === 'trade';
+                        });
+                    } else {
+                        events = events.filter(function (event) {
+                            return event.type === inputs.eventType;
+                        });
+                    }
 
                     return {
                         events: events,
-                        season: inputs.season
+                        season: inputs.season,
+                        eventType: inputs.eventType
                     };
                 });
             }
@@ -80,7 +90,7 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/knockout", "util/bbgmView",
     }
 
     function uiEvery(updateEvents, vm) {
-        components.dropdown("event-log-dropdown", ["seasons"], [vm.season()], updateEvents);
+        components.dropdown("event-log-dropdown", ["seasons", "eventType"], [vm.season(), vm.eventType()], updateEvents);
     }
 
     return bbgmView.init({

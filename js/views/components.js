@@ -122,6 +122,25 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "util/helpers"], function
                             key: "totals"
                         }
                     ];
+                } else if (fields[i] === "eventType") {
+                    options = [
+                        {
+                            val: "All Types",
+                            key: "all"
+                        },
+                        {
+                            val: "Resign",
+                            key:  "reSigned"
+                        },
+                        {
+                            val: "Released",
+                            key: "released"
+                        },
+                        {
+                            val: "Trades",
+                            key: "trade"
+                        }
+                    ]
                 }
                 vm.fields().push({
                     id: fieldId,
