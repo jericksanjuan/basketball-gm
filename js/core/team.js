@@ -722,8 +722,9 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                 filterAttrs(ft, t[i], options);
                 filterSeasonAttrs(ft, t[i], options);
                 filterStats(ft, t[i], options);
-                if (options.getTeam)
+                if (options.getTeam) {
                     ft.team = t[i];
+                }
                 fts.push(ft);
             }
 

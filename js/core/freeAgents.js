@@ -56,13 +56,13 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     // Prioritize younger high valued free agents
                     players.sort(function (a, b) {
                         var x = b.value - a.value;
-                        return x == 0? a.born.year - b.born.year: x;
+                        return x === 0? a.born.year - b.born.year: x;
                     });
                 } else {
                     // For contending teams, prioritize high valued veterans
                     players.sort(function (a, b) {
                         var x = b.value - a.value;
-                        return x == 0? b.born.year - a.born.year: x;
+                        return x === 0? b.born.year - a.born.year: x;
                     });
                 }
 
@@ -93,6 +93,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     var i, p;
 
                     if (numPlayersOnRoster < 15) {
+                        var output = function  () {
+                            return team.rosterAutoSort(tx, tid);
+                        }
                         for (i = 0; i < players.length; i++) {
                             // Don't sign minimum contract players to fill out the roster
                             if (players[i].contract.amount + payroll <= g.salaryCap || (players[i].contract.amount === g.minContract && numPlayersOnRoster < 13)) {
@@ -115,9 +118,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                                 players.splice(i, 1); // Remove from list of free agents
 
                                 // If we found one, stop looking for this team
-                                return dao.players.put({ot: tx, value: p}).then(function () {
-                                    return team.rosterAutoSort(tx, tid);
-                                });
+                                return dao.players.put({ot: tx, value: p}).then(output);
                             }
                         }
                     }

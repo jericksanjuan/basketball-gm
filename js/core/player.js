@@ -1716,23 +1716,18 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
     /**
     * Reverse engineer the value of current to apply own fuzz.
     */
-    function cpuValue(p, scoutingRank) {
+    function cpuValue(p, fuzz) {
         var current, age, ratings, fuzz, ovrF, potF, currentTemp;
 
         age = (p.draft.year > g.season) ? p.draft.year - p.born.year : g.season - p.born.year;
 
         ratings = p.ratings[p.ratings.length -1];
         current = getCurrentWithValue(age, p.value, ratings.pot, ratings.ovr );
-        console.log('current', current);
 
-        fuzz = genFuzz(scoutingRank);
-        console.log(fuzz);
         ovrF = fuzzRating(ratings.ovr, fuzz);
         potF = fuzzRating(ratings.pot, fuzz);
-        console.log(ovrF, potF);
 
         currentTemp = 0.3 * ovrF + 0.7 * current;
-        console.log('currentTemp', currentTemp);
         return getValueWithPotential(age, potF, currentTemp);
     }
 
@@ -2150,6 +2145,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         augmentPartialPlayer: augmentPartialPlayer,
         checkStatisticalFeat: checkStatisticalFeat,
         killOne: killOne,
-        cpuValue, cpuValue
+        cpuValue: cpuValue,
+        genFuzz: genFuzz
     };
 });

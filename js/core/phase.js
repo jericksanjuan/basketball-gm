@@ -576,7 +576,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
     }
 
     function newPhaseFreeAgency(tx) {
-        var strategies, payrolls, hypes, cashes, profits, releasedEvent;
+        var strategies, payrolls, hypes, cashes, profits, tms, fuzzes, releasedEvent;
 
         releasedEvent = function(p) {
             eventLog.add(null, {
@@ -601,6 +601,11 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             cashes = _.pluck(teams, "cash");
             profits = _.pluck(teams, "profit");
             tms = _.pluck(teams, "team");
+            fuzzes = tms.map(function(tm) {
+                var scoutingRank = finances.getRankLastThree(tm, "expenses",  "scouting");
+                return player.genFuzz(scoutingRank);
+            });
+
 
             // Delete all current negotiations to resign players
             return contractNegotiation.cancelAll(tx);
@@ -636,15 +641,16 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                                     age = g.season - p.born.year;
 
                                 // Add fuzz
-                                // scoutingRank = finances.getRankLastThree(tms[p.tid], "expenses", "scouting");
-
+                                scoutingRank = finances.getRankLastThree(tms[p.tid], "expenses", "scouting");
+                                fuzzValue = player.cpuValue(p, fuzzes[p.tid]);
+                                console.log('scoutingRank', scoutingRank, 'pvalue', p.value, 'fuzzValue', fuzzValue);
 
 
                                 // Make it more likely for teams to resign starters and stars.
-                                if (p.value >= 60)
+                                if (fuzzValue >= 60)
                                     factor -= 0.15;
 
-                                if (p.value >= 70)
+                                if (fuzzValue >= 70)
                                     factor -= 0.15;
 
 
@@ -666,7 +672,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
 
                                 factor -= hypes[p.tid]/10;
 
-                                if (Math.random() < p.value / 100 - factor) { // Should eventually be smarter than a coin flip
+                                if (Math.random() < fuzzValue / 100 - factor) { // Should eventually be smarter than a coin flip
                                     // See also core.team
                                     contract = player.genContract(p);
                                     contract.exp += 1; // Otherwise contracts could expire this season
