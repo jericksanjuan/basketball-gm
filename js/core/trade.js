@@ -89,7 +89,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             'dumppick'
         ];
         var t = tm1;
-        console.log(t);
 
         var possible = [];
         if (g.phase === g.PHASE.FREE_AGENCY) {
@@ -105,7 +104,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         }
 
         if (t.isRebuilding) {
-            console.log('is rebuilding');
             // Rebuilding teams
             if (t.gp > 27) {
                 if (t.isTaxPaying && t.hasLosingRec) {
@@ -127,7 +125,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             }
 
         } else {
-            console.log('is contending');
 
             // Contending teams
             if (t.isTaxPaying && t.gp > 27) {
@@ -167,7 +164,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             freeforall: tscene.freeforall
         };
         var choice = random.choice(possible);
-        console.log("choice:", choice);
         return [outcomes[choice], tm1, teams, choice];
     }
 
@@ -181,7 +177,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
         if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS) {
             return;
         }
-        console.log('creating trade...');
 
         tx = dao.tx(["players", "playerStats", "teams", "releasedPlayers", "draftPicks"], 'readwrite');
         var mapFunc = getTeamInfo(tx);
@@ -214,7 +209,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             var doTrade = function(tradeTeams) {
 
                 if(!tradeTeams) {
-                    console.log('Trade not found');
                     return;
                 }
                 var reason = tradeTeams[0].scene;
@@ -225,7 +219,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                 .spread(function (estValues) {
                     return makeItWork(tradeTeams, false, estValues).spread(function (found, tradeTeams) {
                         if(!found) {
-                            console.log('Trade not found');
                             return;
                         }
 
@@ -266,7 +259,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
     function applyTrade(teams, reason) {
         var dpids, pids, tids, forceTrade;
 
-        console.log('teams', teams);
 
         tids = [teams[0].tid, teams[1].tid];
         pids = [teams[0].pids, teams[1].pids];
@@ -276,11 +268,8 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
             var outcome;
             // FIXME: promises not yet done here?
             if (s.warning) {
-                console.warn('Invalid trade.');
                 return [false, null];
             }
-            console.log('summary', s);
-            console.log('--');
 
             outcome = "rejected"; // Default
 
@@ -344,7 +333,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
 
                         if (strings.length === 0) {
                             text = "nothing";
-                            console.log('nothing', t);
                         } else if (strings.length === 1) {
                             text = strings[0];
                         } else if (strings.length === 2) {
@@ -364,7 +352,6 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                     };
                     var eventText = 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[0]], g.season]) + '">' + g.teamNamesCache[tids[0]] + '</a> traded ' + formatAssetsEventLog(s.teams[0]) + ' to the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[1]], g.season]) + '">' + g.teamNamesCache[tids[1]] + '</a> for ' + formatAssetsEventLog(s.teams[1]) + '.';
                     eventText += ' [' + reason +']';
-                    console.info(eventText);
                     eventLog.add(null, {
                         type: "trade",
                         text: eventText,

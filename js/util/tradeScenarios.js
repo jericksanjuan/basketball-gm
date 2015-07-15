@@ -4,7 +4,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
     var exprole, expstarter, disgruntled, freespace, lesstax, tradepick, dumppick, freeforall;
 
     exprole = function(tx, tm1, teams) {
-        console.log('Dealing expiring contracts');
         var pid, tm2, ft;
 
         ft = teams.filter(th.isRebuilding);
@@ -21,18 +20,14 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 }),
             ])
             .spread(function (players) {
-                console.debug(tm1, tm2);
 
-                console.log(players);
                 players = players.filter(
                     th.andF(th.expThisSeason, th.atLeastFive, th.roleplayers, th.areVeterans));
 
-                console.log(players);
                 if (players.length === 0)
                     return false;
                 players = players.sort(th.oldestFirst);
                 players = players.slice(0,3);
-                console.log('selection', players);
                 pid = random.choice(players).pid;
 
                 var output = [];
@@ -45,7 +40,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
     };
 
     expstarter = function(tx, tm1, teams) {
-        console.log('Dealing expiring contracts');
         var pid, tm2, ft;
 
         ft = teams.filter(th.andF(
@@ -78,7 +72,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                     return false;
                 players = players.sort(th.oldestFirst);
                 players = players.slice(0,2);
-                console.log('selection', players);
                 pid = random.choice(players).pid;
 
                 var output = [];
@@ -91,7 +84,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
     };
 
     disgruntled = function(tx, tm1, teams) {
-        console.log('have to trade disgruntled star');
         var pid, tm2, ft;
 
         ft = teams.filter(th.andF(
@@ -122,7 +114,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                     return false;
                 players = players.sort(th.oldestFirst);
                 players = players.slice(0,2);
-                console.log('selection', players);
                 pid = random.choice(players).pid;
 
                 var output = [];
@@ -135,7 +126,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
 
 
     freespace = function(tx, tm1, teams) {
-        console.log('trading for expiring deals');
         var pid, tm2, ft, pid2;
 
         ft = teams.filter(function(o) {return o.hasSpaceForRole; });
@@ -173,7 +163,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                     return false;
                 players = players.sort(th.costlyFirst);
                 players = players.slice(0,2);
-                console.log('selection', players);
                 pid = random.choice(players).pid;
 
                 others = others.filter(th.andF(
@@ -195,7 +184,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
     };
 
     lesstax = function(tx, tm1, teams) {
-        console.log('moving assets to free lessen tax');
         var pid, tm2, ft, taxAmount;
 
         taxAmount = g.luxuryTax - tm1.payroll;
@@ -231,7 +219,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                     return false;
                 players = players.sort(th.costlyFirst);
                 players = players.slice(0,2);
-                console.log('selection', players);
                 pid = random.choice(players).pid;
 
                 var output = [];
@@ -244,7 +231,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
 
     // contending, offer pick(s) for role players with skills
     tradepick = function(tx, tm1, teams) {
-        console.log('shopping pick for player with value');
         if (teams.length === 0)
             return false;
 
@@ -284,7 +270,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
     };
 
     dumppick = function(tx, tm1, teams) {
-        console.log('dumping pick for future');
 
         if (teams.length === 0)
             return false;
@@ -313,7 +298,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
     };
 
     freeforall = function(tx, tm1, teams) {
-        console.log('Explore trades');
         var pid, tm2, ft;
 
         if (teams.length === 0)
@@ -329,7 +313,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                 }),
             ])
             .spread(function (players) {
-                console.debug(tm1, tm2);
 
                 var filters;
                 if (tm1.isFavorite) {
@@ -347,7 +330,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
 
                 if (players.length === 0)
                     return false;
-                console.log('selection', players);
                 pid = random.choice(players).pid;
 
                 var mtids, mpids, mdpids;
@@ -364,7 +346,6 @@ define(["dao", "globals", "lib/bluebird", "util/random", "util/tradeHelpers"], f
                     { tid: mtids, pids: mpids, dpids: mdpids, scene: "freeforall"},
                     { tid: otherTid, pids: otherPid, dpids: otherDpid}
                 ]
-                console.log('BLANK', JSON.stringify(output));
 
                 return Promise.try(function() {return output; });
             });
