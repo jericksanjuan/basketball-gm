@@ -301,9 +301,6 @@ require(["db", "views", "ui", "data/changes", "lib/davis", "util/account", "util
             this.get("/l/:lid/player_feats/:abbrev/:season", views.playerFeats.get);
             this.get("/l/:lid/player_feats/:abbrev/:season/:playoffs", views.playerFeats.get);
             this.get("/l/:lid/multi_team_mode", views.multiTeamMode.get);
-            this.get("/l/:lid/team_transactions", views.teamTransaction.get);
-            this.get("/l/:lid/team_transactions/:abbrev", views.teamTransaction.get);
-            this.get("/l/:lid/team_transactions/:abbrev/:season", views.teamTransaction.get);
         });
 
         app.start();
