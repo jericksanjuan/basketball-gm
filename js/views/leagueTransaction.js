@@ -7,7 +7,7 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/knockout", "util/bbgmView",
 
     function get(req) {
         return {
-            eventType: req.params.eventType || "all",
+            eventType: req.params.eventType,
             season: helpers.validateSeason(req.params.season)
         };
     }
@@ -32,9 +32,10 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/knockout", "util/bbgmView",
                     events.reverse(); // Newest first
 
                     // Filter by type
+                    console.log(inputs.eventType);
                     if (inputs.eventType === "all") {
                         events = events.filter(function (event) {
-                            return event.type === 'reSigned' || event.type === 'released' || event.type === 'trade' || event.type === 'freeAgent' || event.type === 'draft';
+                            return event.type === 'reSigned' || event.type === 'released' || event.type === 'trade';
                         });
                     } else {
                         events = events.filter(function (event) {
