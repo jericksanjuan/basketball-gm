@@ -357,7 +357,7 @@ define(["dao", "globals", "core/league", "core/season", "core/player", "core/tea
                         text: eventText,
                         showNotification: true,
                         pids: pids[0].concat(pids[1]),
-                        tids: tids.concat(28)  //Temp log all trades;
+                        tids: tids
                     });
                 }
 
