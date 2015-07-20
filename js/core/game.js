@@ -141,7 +141,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                 teamSeason.expenses.health.amount += healthPaid;
                 teamSeason.expenses.facilities.amount += facilitiesPaid;
 
-                keys = ['min', 'fg', 'fga', 'fgAtRim', 'fgaAtRim', 'fgLowPost', 'fgaLowPost', 'fgMidRange', 'fgaMidRange', 'tp', 'tpa', 'ft', 'fta', 'orb', 'drb', 'ast', 'tov', 'stl', 'blk', 'pf', 'pts'];
+                keys = ['min', 'fg', 'fga', 'fgAtRim', 'fgaAtRim', 'fgLowPost', 'fgaLowPost', 'fgMidRange', 'fgaMidRange', 'tp', 'tpa', 'ft', 'fta', 'orb', 'drb', 'ast', 'tov', 'stl', 'blk', 'pf', 'pfd', 'pts'];
                 for (i = 0; i < keys.length; i++) {
                     teamStats[keys[i]] += results.team[t1].stat[keys[i]];
                 }
@@ -241,7 +241,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                         shortCircuit();
 
                         // Update stats
-                        keys = ['gs', 'min', 'fg', 'fga', 'fgAtRim', 'fgaAtRim', 'fgLowPost', 'fgaLowPost', 'fgMidRange', 'fgaMidRange', 'tp', 'tpa', 'ft', 'fta', 'pm', 'orb', 'drb', 'ast', 'tov', 'stl', 'blk', 'ba', 'pf', 'pts'];
+                        keys = ['gs', 'min', 'fg', 'fga', 'fgAtRim', 'fgaAtRim', 'fgLowPost', 'fgaLowPost', 'fgMidRange', 'fgaMidRange', 'tp', 'tpa', 'ft', 'fta', 'pm', 'orb', 'drb', 'ast', 'tov', 'stl', 'blk', 'ba', 'pf', 'pfd', 'pts'];
                         for (i = 0; i < keys.length; i++) {
                             ps[keys[i]] += p.stat[keys[i]];
                         }
