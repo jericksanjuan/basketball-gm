@@ -812,6 +812,8 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
 
         this.doPf(this.d);
         p = this.playersOnCourt[this.o][shooter];
+        this.recordStat(this.o, p, "pfd");
+        this.recordPlay("pfd", this.o, [this.team[this.o].player[p].name]);
         for (i = 0; i < amount; i++) {
             this.recordStat(this.o, p, "fta");
             if (Math.random() < this.team[this.o].player[p].compositeRating.shootingFT * 0.3 + 0.6) {  // Between 60% and 90%
@@ -1035,6 +1037,8 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
                 texts = ["{0} missed a free throw"];
             } else if (type === "pf") {
                 texts = ["Foul on {0}"];
+            } else if (type === 'pfd') {
+                texts = ["{0} drew the foul"]
             } else if (type === "foulOut") {
                 texts = ["{0} fouled out"];
             } else if (type === "sub") {
