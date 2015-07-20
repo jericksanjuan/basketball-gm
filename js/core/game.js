@@ -304,7 +304,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
         };
 
         for (t = 0; t < 2; t++) {
-            keys = ['min', 'fg', 'fga', 'fgAtRim', 'fgaAtRim', 'fgLowPost', 'fgaLowPost', 'fgMidRange', 'fgaMidRange', 'tp', 'tpa', 'ft', 'fta', 'orb', 'drb', 'ast', 'tov', 'stl', 'blk', 'ba', 'pf', 'pts', 'ptsQtrs'];
+            keys = ['min', 'fg', 'fga', 'fgAtRim', 'fgaAtRim', 'fgLowPost', 'fgaLowPost', 'fgMidRange', 'fgaMidRange', 'tp', 'tpa', 'ft', 'fta', 'orb', 'drb', 'ast', 'tov', 'stl', 'blk', 'ba', 'pf', 'pfd', 'pts', 'ptsQtrs'];
             for (i = 0; i < keys.length; i++) {
                 gameStats.teams[t][keys[i]] = results.team[t].stat[keys[i]];
             }
