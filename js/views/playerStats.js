@@ -121,7 +121,7 @@ define(["dao", "globals", "ui", "core/player", "lib/jquery", "lib/knockout", "vi
         }).extend({throttle: 1});
 
         ko.computed(function () {
-            var abbrev, d, i, p, players, pos, rows, season, tid;
+            var abbrev, d, i, p, players, pos, rows, rowsOff, rowsDef, rowsAdv, season, tid;
 
             season = vm.season();
 
@@ -133,6 +133,10 @@ define(["dao", "globals", "ui", "core/player", "lib/jquery", "lib/knockout", "vi
             }
 
             rows = [];
+            rowsOff = [];
+            rowsDef = [];
+            rowsAdv = [];
+
             players = vm.players();
             for (i = 0; i < vm.players().length; i++) {
                 p = players[i];
@@ -161,26 +165,43 @@ define(["dao", "globals", "ui", "core/player", "lib/jquery", "lib/knockout", "vi
                 }
 
                 // Skip no stats: never played, didn't make playoffs, etc
+                p.nameLabel = helpers.playerNameLabels(p.pid, p.name, p.injury, p.ratings.skills, p.watch);
+                p.teamLink = '<a href="' + helpers.leagueUrl(["roster", abbrev, season]) + '">' + abbrev + '</a>';
+                var rowStart = [p.nameLabel, pos, p.teamLink, String(p.stats.gp), String(p.stats.gs), helpers.round(p.stats.min, d)];
                 if (p.stats.gp) {
-                    rows.push([helpers.playerNameLabels(p.pid, p.name, p.injury, p.ratings.skills, p.watch), pos, '<a href="' + helpers.leagueUrl(["roster", abbrev, season]) + '">' + abbrev + '</a>', String(p.stats.gp), String(p.stats.gs), helpers.round(p.stats.min, d), helpers.round(p.stats.fg, d), helpers.round(p.stats.fga, d), helpers.round(p.stats.fgp, 1), helpers.round(p.stats.tp, d), helpers.round(p.stats.tpa, d), helpers.round(p.stats.tpp, 1), helpers.round(p.stats.ft, d), helpers.round(p.stats.fta, d), helpers.round(p.stats.ftp, 1), helpers.round(p.stats.orb, d), helpers.round(p.stats.drb, d), helpers.round(p.stats.trb, d), helpers.round(p.stats.ast, d), helpers.round(p.stats.tov, d), helpers.round(p.stats.stl, d), helpers.round(p.stats.blk, d), helpers.round(p.stats.ba, d), helpers.round(p.stats.pf, d), helpers.round(p.stats.pts, d), helpers.plusMinus(p.stats.pm, d), helpers.round(p.stats.per, 1), helpers.round(p.stats.ewa, 1), p.hof, tid === g.userTid]);
+                    rows.push(rowStart.concat(
+                        [helpers.round(p.stats.fg, d), helpers.round(p.stats.fga, d), helpers.round(p.stats.fgp, 1), helpers.round(p.stats.tp, d), helpers.round(p.stats.tpa, d), helpers.round(p.stats.tpp, 1), helpers.round(p.stats.ft, d), helpers.round(p.stats.fta, d), helpers.round(p.stats.ftp, 1), helpers.round(p.stats.orb, d), helpers.round(p.stats.drb, d), helpers.round(p.stats.trb, d), helpers.round(p.stats.ast, d), helpers.round(p.stats.tov, d), helpers.round(p.stats.stl, d), helpers.round(p.stats.blk, d), helpers.round(p.stats.ba, d), helpers.round(p.stats.pf, d), helpers.round(p.stats.pts, d), p.hof, tid === g.userTid]
+                    ));
+
+                    rowsAdv.push(rowStart.concat(
+                        [helpers.plusMinus(p.stats.pm, d), helpers.round(p.stats.per, 1), helpers.round(p.stats.ewa, 1), p.hof, tid === g.userTid]
+                    ));
                 }
+
             }
 
-            ui.datatable($("#player-stats"), 2, rows, {
-                rowCallback: function (row, data) {
-                    // Highlight HOF players
-                    if (data[data.length - 2]) {
-                        row.classList.add("danger");
-                    }
-                    // Highlight user's team
-                    if (data[data.length - 1]) {
-                        row.classList.add("info");
-                    }
+            var highlightF = function (row, data) {
+                // Highlight HOF players
+                if (data[data.length - 2]) {
+                    row.classList.add("danger");
                 }
+                // Highlight user's team
+                if (data[data.length - 1]) {
+                    row.classList.add("info");
+                }
+            };
+
+            // console.log(rows);
+            ui.datatable($("#player-stats"), 2, rows, {
+                rowCallback: highlightF,
+            });
+            ui.datatable($("#player-stats-advanced"), 2, rowsAdv, {
+                rowCallback: highlightF,
             });
         }).extend({throttle: 1});
 
         ui.tableClickableRows($("#player-stats"));
+
     }
 
     function uiEvery(updateEvents, vm) {
