@@ -27,7 +27,8 @@ window.boxPlot = (function () {
             min: data[0],
             q1: quartile(data, 1),
             median: quartile(data, 2),
-            q3: quartile(data, 3),
+            // q3: quartile(data, 3),
+            q3: data.reduce(function(a,b) {return a + b;})/data.length, // test average
             max: data[data.length - 1]
         };
     }

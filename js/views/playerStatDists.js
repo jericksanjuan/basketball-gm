@@ -51,7 +51,7 @@ define(["dao", "globals", "ui", "core/player", "lib/boxPlot", "lib/jquery", "lib
 
                 players = player.filter(players, {
                     ratings: ["skills"],
-                    stats: ["gp", "gs", "min", "fg", "fga", "fgp", "tp", "tpa", "tpp", "ft", "fta", "ftp", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "pf", "pts", "per"],
+                    stats: ["gp", "gs", "min", "fg", "fga", "fgp", "tp", "tpp", "ft", "fta", "ftp", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "pf", "pts", "per", "fgaAtRim", "fgaLowPost", "fgaMidRange", "tpa"],
                     season: inputs.season
                 });
 
@@ -121,14 +121,14 @@ define(["dao", "globals", "ui", "core/player", "lib/boxPlot", "lib/jquery", "lib
                 blk: [0, 5],
                 pf: [0, 6],
                 pts: [0, 50],
-                per: [0, 35]
+                per: [0, 35],
             };
 
             for (stat in vm.statsAll) {
                 if (vm.statsAll.hasOwnProperty(stat)) {
                     boxPlot.create({
                         data: vm.statsAll[stat](),
-                        scale: scale[stat],
+                        scale: scale[stat] || [0,10],
                         container: stat + "BoxPlot"
                     });
 

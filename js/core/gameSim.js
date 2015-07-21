@@ -611,6 +611,70 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
         return "stl";
     };
 
+    GameSim.prototype.probMake = function(type, shotRating) {
+        var probFactor = {
+            'threePointer': [0.35, 0.25],
+            'midRange': [0.3, 0.29],
+            'atRim': [0.3, 0.52],
+            'lowPost': [0.3, 0.37]
+        };
+
+        return shotRating * probFactor[type][0] + probFactor[type][1];
+    };
+
+    GameSim.prototype.getShot = function(shooter) {
+        var pRatings, dRatings, synergyFactor, goInside, total, oppDef, r1, r2, type, shotType,
+            oppFactor, probMake, probMissAndFoul;
+
+        var probFoul = {
+            'threePointer': 0.08,
+            'midRange': 0.18,
+            'atRim': 0.62,
+            'lowPost': 0.52
+        }
+
+        pRatings = this.team[this.o].player[shooter].compositeRating; // shooter's ratings
+        dRatings = this.team[this.o].compositeRating;  // opponent's defense ratings
+        synergyFactor = this.synergyFactor * (this.team[this.o].synergy.off - this.team[this.d].synergy.def);
+
+        // Decide type of shot
+        // Base on shooting skills
+        goInside = pRatings.shootingAtRim + pRatings.shootingLowPost
+        total = goInside + pRatings.shootingMidRange + pRatings.shootingThreePointer;
+        // plus factor base on opponent's defense;
+        oppDef = (dRatings.defensePerimeter - dRatings.defenseInterior) * 0.7;
+
+        if (this.oppDef) {
+            this.oppDef = (this.oppDef + oppDef)/2;
+        } else {
+            this.oppDef = oppDef;
+        }
+
+        goInside = 1 - goInside/total;
+        goInside = Math.random() > (goInside - synergyFactor - oppDef);
+
+        if (goInside) {
+            r1 = pRatings.shootingAtRim * Math.random();
+            r2 = pRatings.shootingLowPost * Math.random();
+            type = (r1 > r2) ? 'atRim' : 'lowPost';
+            oppFactor = (r1 > r2) ? 2 : 2.5;
+            oppFactor *= dRatings.defenseInterior;
+        } else {
+            r1 = pRatings.shootingThreePointer * Math.random() * 0.25; // 0.21
+            r2 = pRatings.shootingMidRange * Math.random() * 0.32; // 0.32
+            type = (r1 > r2) ? 'threePointer' : 'midRange';
+            oppFactor = (r1 > r2) ? 1.25 : 1.5;
+            oppFactor *= dRatings.defensePerimeter;
+        }
+
+        shotType = 'shooting' + type.charAt(0).toUpperCase() + type.slice(1);
+        oppFactor = 1/oppFactor;
+        oppFactor *= pRatings[shotType];
+        probMake = this.probMake(type, pRatings[shotType]);
+        probMissAndFoul = this.possFactor * probFoul[type] * oppFactor;
+        return [type, probMake, probMissAndFoul];
+    };
+
     /**
      * Shot.
      *
@@ -619,7 +683,9 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
      * @return {string} Either "fg" or output of this.doReb, depending on make or miss and free throws.
      */
     GameSim.prototype.doShot = function (shooter) {
-        var fatigue, p, passer, probAndOne, probMake, probMissAndFoul, r1, r2, r3, ratios, type, oppFactor;
+        var fatigue, p, passer, probAndOne, probMake, probMissAndFoul, type,
+            ratios, tmp;
+            //r1, r2, r3, ratios, type, oppFactor, tmp;
 
         p = this.playersOnCourt[this.o][shooter];
 
@@ -632,52 +698,10 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
             passer = this.pickPlayer(ratios, shooter);
         }
 
-        // Pick the type of shot and store the success rate (with no defense) in probMake and the probability of an and one in probAndOne
-        if (this.team[this.o].player[p].compositeRating.shootingThreePointer > 0.5 && Math.random() < (0.35 * this.team[this.o].player[p].compositeRating.shootingThreePointer)) {
-            // Three pointer
-            type = "threePointer";
-            probMake = this.team[this.o].player[p].compositeRating.shootingThreePointer * 0.35 + 0.24;
-            // probMissAndFoul = 0.02;
-            // probAndOne = 0.01;
-            oppFactor = this.team[this.o].player[p].compositeRating.shootingThreePointer;
-            oppFactor /= 1.25 * this.team[this.d].compositeRating.defensePerimeter;
-            probMissAndFoul = this.possFactor * .08 * oppFactor;
-        } else {
-            r1 = Math.random() * this.team[this.o].player[p].compositeRating.shootingMidRange;
-            r2 = Math.random() * (this.team[this.o].player[p].compositeRating.shootingAtRim + this.synergyFactor * (this.team[this.o].synergy.off - this.team[this.d].synergy.def));  // Synergy makes easy shots either more likely or less likely
-            r3 = Math.random() * (this.team[this.o].player[p].compositeRating.shootingLowPost + this.synergyFactor * (this.team[this.o].synergy.off - this.team[this.d].synergy.def));  // Synergy makes easy shots either more likely or less likely
-            if (r1 > r2 && r1 > r3) {
-                // Two point jumper
-                type = "midRange";
-                probMake = this.team[this.o].player[p].compositeRating.shootingMidRange * 0.3 + 0.29;
-                // probMissAndFoul = 0.07;
-                // probAndOne = 0.05;
-                oppFactor = this.team[this.o].player[p].compositeRating.shootingMidRange;
-                oppFactor /= 1.5 * this.team[this.d].compositeRating.defensePerimeter;
-                probMissAndFoul = this.possFactor * 0.18 * oppFactor;
-            } else if (r2 > r3) {
-                // Dunk, fast break or half court
-                type = "atRim";
-                probMake = this.team[this.o].player[p].compositeRating.shootingAtRim * 0.3 + 0.52;
-                // probMissAndFoul = 0.37;
-                // probAndOne = 0.25;
-                oppFactor = this.team[this.o].player[p].compositeRating.shootingAtRim;
-                oppFactor /= 2 * this.team[this.d].compositeRating.defenseInterior;
-                probMissAndFoul = this.possFactor * 0.62 * oppFactor;
-            } else {
-                // Post up
-                type = "lowPost";
-                probMake = this.team[this.o].player[p].compositeRating.shootingLowPost * 0.3 + 0.37;
-                // probMissAndFoul = 0.33;
-                // probAndOne = 0.15;
-                oppFactor = this.team[this.o].player[p].compositeRating.shootingLowPost;
-                oppFactor /= 2.5 * this.team[this.d].compositeRating.defenseInterior;
-                probMissAndFoul = this.possFactor * 0.52 * oppFactor;
-            }
-        }
-        probMissAndFoul *= random.uniform(1, 1.1);
-        probAndOne = probMissAndFoul * 0.282
-        // console.log('oppFactor', oppFactor, probMissAndFoul, probAndOne);
+        tmp = this.getShot(p, fatigue);
+        type = tmp[0]; probMake=tmp[1]; probMissAndFoul=tmp[2];
+        probMissAndFoul *= random.uniform(1, 1.1) * fatigue;
+        probAndOne = probMissAndFoul * 0.282;
 
         probMake = (probMake - 0.25 * this.team[this.d].compositeRating.defense + this.synergyFactor * (this.team[this.o].synergy.off - this.team[this.d].synergy.def)) * fatigue;
 
@@ -702,7 +726,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
         // Miss, but fouled
         if (probMissAndFoul > Math.random()) {
             var r = { atRim: 'fgaAtRim', lowPost: 'fgaLowPost', midRange: 'fgaMidRange', threePointer: 'tpa'};
-            this.recordStat(this.o, p, r.type );
+            // this.recordStat(this.o, p, r.type );  //debug
             if (type === "threePointer") {
                 return this.doFt(shooter, 3);  // fg, orb, or drb
             }
@@ -886,7 +910,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
     GameSim.prototype.probNoShotPf = function () {
         var v = this.team[this.d].compositeRating.fouling;
         v /= 0.5 * (this.team[this.o].compositeRating.dribbling + this.team[this.o].compositeRating.passing);
-        v = v * this.possFactor * .12;
+        v = v * this.possFactor * 0.12;
         // console.log('non shooting foul', v);
         return v;
     };
