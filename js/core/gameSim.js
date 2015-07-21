@@ -718,6 +718,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
         if (probMake > Math.random()) {
             // And 1
             if (probAndOne > Math.random()) {
+                this.doPf(this.d);
                 return this.doFg(shooter, passer, type, true);  // fg, orb, or drb
             }
             return this.doFg(shooter, passer, type);  // fg
@@ -727,6 +728,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
         if (probMissAndFoul > Math.random()) {
             var r = { atRim: 'fgaAtRim', lowPost: 'fgaLowPost', midRange: 'fgaMidRange', threePointer: 'tpa'};
             // this.recordStat(this.o, p, r.type );  //debug
+            this.doPf(this.d);
             if (type === "threePointer") {
                 return this.doFt(shooter, 3);  // fg, orb, or drb
             }
@@ -873,7 +875,6 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
     GameSim.prototype.doFt = function (shooter, amount) {
         var i, outcome, p;
 
-        this.doPf(this.d);
         p = this.playersOnCourt[this.o][shooter];
         this.doPfd(this.o, p);
         for (i = 0; i < amount; i++) {
@@ -940,8 +941,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
      */
     GameSim.prototype.probOffPf = function () {
         var v = 0.1 * this.team[this.o].compositeRating.fouling;
-        v /= 2 * this.team[this.o].compositeRating.athleticism;
-        // console.log('Offensive foul', v);
+        v /= 3 * this.team[this.o].compositeRating.athleticism;
         return v;
     };
 

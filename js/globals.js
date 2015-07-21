@@ -148,8 +148,8 @@ define(["lib/knockout"], function (ko) {
             weights: [1.5, 0.5, 0.5]
         },
         fouling: {
-            ratings: ['constant', 'hgt', 'blk', 'spd'],
-            weights: [1.5, 1, 1, -1]
+            ratings: ['constant', 'hgt', 'stre', 'spd', 'jmp', 'stl', 'blk'],
+            weights: [1.4, 0.6, 0.2, -0.3, -0.25, 0.05, 0.1]
         },
         defense: {
             ratings: ['hgt', 'stre', 'spd', 'jmp', 'blk', 'stl'],
