@@ -41,8 +41,13 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
 
         this.id = gid;
         this.team = [team1, team2];  // If a team plays twice in a day, this needs to be a deep copy
+        this.team.map(function(t) { t.pfsQtrs = [0]; });
+
         numPossessions = Math.round((this.team[0].pace + this.team[1].pace) / 2 * random.uniform(0.9, 1.1));
         this.dt = 48 / (2 * numPossessions); // Time elapsed per possession
+
+        // factor for possessions
+        this.possFactor = 100/numPossessions;
 
         // Starting lineups, which will be reset by updatePlayersOnCourt. This must be done because of injured players in the top 5.
         this.playersOnCourt = [[0, 1, 2, 3, 4], [0, 1, 2, 3, 4]];
@@ -132,6 +137,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
         for (t = 0; t < 2; t++) {
             delete this.team[t].compositeRating;
             delete this.team[t].pace;
+            delete this.team[t].pfsQtrs;
             for (p = 0; p < this.team[t].player.length; p++) {
                 delete this.team[t].player[p].valueNoPot;
                 delete this.team[t].player[p].compositeRating;
@@ -159,6 +165,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
     GameSim.prototype.simRegulation = function () {
         var quarter;
 
+        // TODO: Jump ball here?
         this.o = 0;
         this.d = 1;
         quarter = 1;
@@ -174,6 +181,8 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
             }
             this.team[0].stat.ptsQtrs.push(0);
             this.team[1].stat.ptsQtrs.push(0);
+            this.team[0].pfsQtrs.push(0);
+            this.team[1].pfsQtrs.push(0);
             this.t = 12;
             this.recordPlay("quarter");
         }
@@ -212,7 +221,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
         outcome = this.getPossessionOutcome();
 
         // Swap o and d so that o will get another possession when they are swapped again at the beginning of the loop.
-        if (outcome === "orb") {
+        if (outcome === "orb" || outcome === "dpf") {
             this.o = (this.o === 1) ? 0 : 1;
             this.d = (this.o === 1) ? 0 : 1;
         }
@@ -422,7 +431,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
         var i, j, p, rating, t, toUpdate;
 
         // Only update ones that are actually used
-        toUpdate = ["dribbling", "passing", "rebounding", "defense", "defensePerimeter", "blocking"];
+        toUpdate = ["dribbling", "passing", "rebounding", "defense", "defensePerimeter", "defenseInterior", "blocking", "fouling", "athleticism"];
 
         for (t = 0; t < 2; t++) {
             for (j = 0; j < toUpdate.length; j++) {
@@ -442,7 +451,10 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
             this.team[t].compositeRating.rebounding += this.synergyFactor * this.team[t].synergy.reb;
             this.team[t].compositeRating.defense += this.synergyFactor * this.team[t].synergy.def;
             this.team[t].compositeRating.defensePerimeter += this.synergyFactor * this.team[t].synergy.def;
+            this.team[t].compositeRating.defenseInterior += this.synergyFactor * this.team[t].synergy.def;
             this.team[t].compositeRating.blocking += this.synergyFactor * this.team[t].synergy.def;
+            this.team[t].compositeRating.fouling -= this.synergyFactor * this.team[t].synergy.def;
+            this.team[t].compositeRating.athleticism += this.synergyFactor * (this.team[t].synergy.off + this.team[t].synergy.def) * 0.5;
         }
     };
 
@@ -524,6 +536,16 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
             return this.doTov();  // tov
         }
 
+        // Non-shooting foul
+        if (this.probNoShotPf() > Math.random()) {
+            return this.doNoShotPf();  // dpf or ft
+        }
+
+        // Offensive foul
+        if (this.probOffPf() > Math.random()) {
+            return this.doOffPf();  // tov
+        }
+
         // Shot if there is no turnover
         ratios = this.ratingArray("usage", this.o);
         shooter = this.pickPlayer(ratios);
@@ -597,7 +619,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
      * @return {string} Either "fg" or output of this.doReb, depending on make or miss and free throws.
      */
     GameSim.prototype.doShot = function (shooter) {
-        var fatigue, p, passer, probAndOne, probMake, probMissAndFoul, r1, r2, r3, ratios, type;
+        var fatigue, p, passer, probAndOne, probMake, probMissAndFoul, r1, r2, r3, ratios, type, oppFactor;
 
         p = this.playersOnCourt[this.o][shooter];
 
@@ -614,9 +636,12 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
         if (this.team[this.o].player[p].compositeRating.shootingThreePointer > 0.5 && Math.random() < (0.35 * this.team[this.o].player[p].compositeRating.shootingThreePointer)) {
             // Three pointer
             type = "threePointer";
-            probMissAndFoul = 0.02;
             probMake = this.team[this.o].player[p].compositeRating.shootingThreePointer * 0.35 + 0.24;
-            probAndOne = 0.01;
+            // probMissAndFoul = 0.02;
+            // probAndOne = 0.01;
+            oppFactor = this.team[this.o].player[p].compositeRating.shootingThreePointer;
+            oppFactor /= 1.25 * this.team[this.d].compositeRating.defensePerimeter;
+            probMissAndFoul = this.possFactor * .08 * oppFactor;
         } else {
             r1 = Math.random() * this.team[this.o].player[p].compositeRating.shootingMidRange;
             r2 = Math.random() * (this.team[this.o].player[p].compositeRating.shootingAtRim + this.synergyFactor * (this.team[this.o].synergy.off - this.team[this.d].synergy.def));  // Synergy makes easy shots either more likely or less likely
@@ -624,23 +649,35 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
             if (r1 > r2 && r1 > r3) {
                 // Two point jumper
                 type = "midRange";
-                probMissAndFoul = 0.07;
                 probMake = this.team[this.o].player[p].compositeRating.shootingMidRange * 0.3 + 0.29;
-                probAndOne = 0.05;
+                // probMissAndFoul = 0.07;
+                // probAndOne = 0.05;
+                oppFactor = this.team[this.o].player[p].compositeRating.shootingMidRange;
+                oppFactor /= 1.5 * this.team[this.d].compositeRating.defensePerimeter;
+                probMissAndFoul = this.possFactor * 0.18 * oppFactor;
             } else if (r2 > r3) {
                 // Dunk, fast break or half court
                 type = "atRim";
-                probMissAndFoul = 0.37;
                 probMake = this.team[this.o].player[p].compositeRating.shootingAtRim * 0.3 + 0.52;
-                probAndOne = 0.25;
+                // probMissAndFoul = 0.37;
+                // probAndOne = 0.25;
+                oppFactor = this.team[this.o].player[p].compositeRating.shootingAtRim;
+                oppFactor /= 2 * this.team[this.d].compositeRating.defenseInterior;
+                probMissAndFoul = this.possFactor * 0.62 * oppFactor;
             } else {
                 // Post up
                 type = "lowPost";
-                probMissAndFoul = 0.33;
                 probMake = this.team[this.o].player[p].compositeRating.shootingLowPost * 0.3 + 0.37;
-                probAndOne = 0.15;
+                // probMissAndFoul = 0.33;
+                // probAndOne = 0.15;
+                oppFactor = this.team[this.o].player[p].compositeRating.shootingLowPost;
+                oppFactor /= 2.5 * this.team[this.d].compositeRating.defenseInterior;
+                probMissAndFoul = this.possFactor * 0.52 * oppFactor;
             }
         }
+        probMissAndFoul *= random.uniform(1, 1.1);
+        probAndOne = probMissAndFoul * 0.282
+        // console.log('oppFactor', oppFactor, probMissAndFoul, probAndOne);
 
         probMake = (probMake - 0.25 * this.team[this.d].compositeRating.defense + this.synergyFactor * (this.team[this.o].synergy.off - this.team[this.d].synergy.def)) * fatigue;
 
@@ -664,6 +701,8 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
 
         // Miss, but fouled
         if (probMissAndFoul > Math.random()) {
+            var r = { atRim: 'fgaAtRim', lowPost: 'fgaLowPost', midRange: 'fgaMidRange', threePointer: 'tpa'};
+            this.recordStat(this.o, p, r.type );
             if (type === "threePointer") {
                 return this.doFt(shooter, 3);  // fg, orb, or drb
             }
@@ -696,7 +735,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
      * @return {number} Probability from 0 to 1.
      */
     GameSim.prototype.probBlk = function () {
-        return 0.1 * this.team[this.d].compositeRating.blocking;
+        return 0.1 * this.team[this.d].compositeRating.blocking;  //TODO: offensive player should factor here.
     };
 
     /**
@@ -812,8 +851,7 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
 
         this.doPf(this.d);
         p = this.playersOnCourt[this.o][shooter];
-        this.recordStat(this.o, p, "pfd");
-        this.recordPlay("pfd", this.o, [this.team[this.o].player[p].name]);
+        this.doPfd(this.o, p);
         for (i = 0; i < amount; i++) {
             this.recordStat(this.o, p, "fta");
             if (Math.random() < this.team[this.o].player[p].compositeRating.shootingFT * 0.3 + 0.6) {  // Between 60% and 90%
@@ -835,25 +873,100 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
     };
 
     /**
+     * Draw foul
+     */
+    GameSim.prototype.doPfd = function (t, p) {
+        this.recordStat(t, p, "pfd");
+        this.recordPlay("pfd", t, [this.team[t].player[p].name]);
+    };
+
+    /**
+     * Probability of Non-shooting foul
+     */
+    GameSim.prototype.probNoShotPf = function () {
+        var v = this.team[this.d].compositeRating.fouling;
+        v /= 0.5 * (this.team[this.o].compositeRating.dribbling + this.team[this.o].compositeRating.passing);
+        v = v * this.possFactor * .12;
+        // console.log('non shooting foul', v);
+        return v;
+    };
+
+
+    /**
+     * Non-shooting foul
+     */
+    GameSim.prototype.doNoShotPf = function() {
+        var ratios, shooter, t, k, isPenalty;
+
+        ratios = this.ratingArray("dribbling", this.o);
+        shooter = this.pickPlayer(ratios);
+        t = this.d;
+        isPenalty = this.doPf(this.d);
+        if (isPenalty) {
+            return this.doFt(shooter, 2);
+        } else {
+            shooter = this.playersOnCourt[this.o][shooter];
+            this.doPfd(this.o, shooter);
+        }
+        return "dpf";
+    };
+
+    /**
+     * Probability of Offensive Foul
+     */
+    GameSim.prototype.probOffPf = function () {
+        var v = 0.1 * this.team[this.o].compositeRating.fouling;
+        v /= 2 * this.team[this.o].compositeRating.athleticism;
+        // console.log('Offensive foul', v);
+        return v;
+    };
+
+    /**
+     * Offensive Foul
+     */
+    GameSim.prototype.doOffPf = function () {
+        var ratios, fouler, drawer, dratios;
+
+        dratios = this.ratingArray("defense", this.d);
+        drawer = this.playersOnCourt[this.d][this.pickPlayer(dratios)];
+
+        this.doPf(this.o);
+        // this.doPfd(this.d, drawer);
+
+        return "tov";
+    };
+
+    /**
      * Personal foul.
      *
      * @memberOf core.gameSim
      * @param {number} t Team (0 or 1, this.or or this.d).
      */
     GameSim.prototype.doPf = function (t) {
-        var p, ratios;
+        var p, ratios, rectxt, k;
 
         ratios = this.ratingArray("fouling", t);
         p = this.playersOnCourt[t][this.pickPlayer(ratios)];
-        this.recordStat(this.d, p, "pf");
-        this.recordPlay("pf", this.d, [this.team[this.d].player[p].name]);
+        this.recordStat(t, p, "pf");
+        rectxt = (t === this.o) ? "opf" : "pf";
+        this.recordPlay(rectxt, t, [this.team[t].player[p].name]);
         // Foul out
-        if (this.team[this.d].player[p].stat.pf >= 6) {
-            this.recordPlay("foulOut", this.d, [this.team[this.d].player[p].name]);
+        if (this.team[t].player[p].stat.pf >= 6) {
+            this.recordPlay("foulOut", t, [this.team[t].player[p].name]);
             // Force substitutions now
             this.updatePlayersOnCourt();
             this.updateSynergy();
         }
+
+        // Auto penalty on foul on last two minutes
+        k = this.team[t].pfsQtrs.length - 1;
+        this.team[t].pfsQtrs[k] += 1;
+
+        if (this.t <= 2) {
+            this.team[t].pfsQtrs[k] = Math.max(this.team[t].pfsQtrs[k], 4);
+        }
+
+        return this.team[t].pfsQtrs[k] >= 5;
     };
 
     /**
@@ -1037,8 +1150,10 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
                 texts = ["{0} missed a free throw"];
             } else if (type === "pf") {
                 texts = ["Foul on {0}"];
+            } else if (type === "opf") {
+                texts = ["Offensive Foul on {0}"];
             } else if (type === 'pfd') {
-                texts = ["{0} drew the foul"]
+                texts = ["{0} drew the foul"];
             } else if (type === "foulOut") {
                 texts = ["{0} fouled out"];
             } else if (type === "sub") {
