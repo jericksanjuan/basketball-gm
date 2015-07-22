@@ -167,9 +167,6 @@ define(["dao", "globals", "ui", "core/league", "core/player", "core/season", "co
         this.isCurrentSeason = ko.computed(function () {
             return g.season === this.season();
         }, this);
-        this.isFreeAgency = ko.computed(function () {
-            return g.phase >= g.PHASE.BEFORE_DRAFT;
-        }, this);
 
         this.ptChange = function (p) {
             var pid, ptModifier;
