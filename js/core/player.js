@@ -135,7 +135,8 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
      * @return {Object.<string, number>} Object containing two properties with integer values, "amount" with the contract amount in thousands of dollars and "exp" with the contract expiration year.
      */
     function genContract(p, randomizeExp, randomizeAmount, noLimit) {
-        var amount, expiration, maxAmount, minAmount, potentialDifference, ratings, years;
+        var amount, expiration, maxAmount, minAmount, potentialDifference,
+            ratings, years, age, proExp;
 
         ratings = _.last(p.ratings);
 
@@ -144,8 +145,25 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         noLimit = noLimit !== undefined ? noLimit : false;
 
         // Limits on yearly contract amount, in $1000's
-        minAmount = 500;
-        maxAmount = 20000;
+        minAmount = g.minContract;
+        maxAmount = g.maxContract;
+
+        // If already a vet, adjust min and max contract based on experience.
+        if (p.draft.year < g.season) {
+            age = g.season - p.born.year;
+            proExp = g.season - p.draft.year;
+
+            if (proExp <= 6) {
+                maxAmount *= 0.725;  // min: 500, max: 14500
+            } else if (proExp >= 7 && proExp <= 9) {
+                minAmount *= 2; // min: 1000
+                maxAmount *= 0.875;  // max: 17500
+            } else if (proExp >= 10) {
+                minAmount *= 3;  // min: 1500, max: 20000
+            }
+        } else {
+            age = p.draft.year - p.born.year
+        }
 
         // Scale proportional to (ovr*2 + pot)*0.5 120-210
         //amount = ((3 * p.value) * 0.85 - 110) / (210 - 120);  // Scale from 0 to 1 (approx)
@@ -163,12 +181,17 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
             years = 2;
         }
         // Bad players can only ask for short deals
-        if (ratings.pot < 40) {
+        if (p.value < 40) {
             years = 1;
-        } else if (ratings.pot < 50) {
-            years = 2;
-        } else if (ratings.pot < 60) {
-            years = 3;
+        } else if (p.value < 50) {
+            years = random.randInt(1, 2);
+        } else if (p.value < 60) {
+            years = random.randInt(2, 3);
+        }
+
+        // limit contract length if over 30
+        if  (age > 30) {
+            year = Math.min( years , 3);
         }
 
         // Randomize expiration for contracts generated at beginning of new game
