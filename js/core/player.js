@@ -388,12 +388,14 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
 
             // Randomly make a big jump
             if (Math.random() > 0.985 && age <= 23) {
-                p.ratings[r].pot += random.uniform(5, 25);
+                var val = helpers.bound(random.realGauss(8, 8), 5, 25);
+                p.ratings[r].pot += val;
             }
 
             // Randomly regress
             if (Math.random() > 0.995 && age <= 23) {
-                p.ratings[r].pot -= random.uniform(5, 25);
+                var val = helpers.bound(random.realGauss(8, 8), 5, 25);
+                p.ratings[r].pot -= val;
             }
 
             baseChange = calcBaseChange(age, p.ratings[r].pot - p.ratings[r].ovr);

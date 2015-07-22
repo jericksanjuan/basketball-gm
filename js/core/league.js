@@ -410,8 +410,10 @@ define(["dao", "db", "globals", "ui", "core/draft", "core/finances", "core/phase
                 } else {
                     // No players in league file, so generate new players
                     profiles = ["Point", "Wing", "Big", ""];
-                    baseRatings = [37, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 26, 26, 26];
-                    pots = [75, 65, 55, 55, 60, 50, 70, 40, 55, 50, 60, 60, 45, 45];
+                    // baseRatings = [37, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 26, 26, 26];
+                    // pots = [75, 65, 55, 55, 60, 50, 70, 40, 55, 50, 60, 60, 45, 45];
+                    baseRatings = [];
+                    pots = [];
 
                     for (t = -3; t < teams.length; t++) {
                         // Create multiple "teams" worth of players for the free agent pool
@@ -421,20 +423,30 @@ define(["dao", "db", "globals", "ui", "core/draft", "core/finances", "core/phase
                             t2 = t;
                         }
 
+                        baseRatings = [];
+                        pots = [];
+                        for (var i =0; i<14; i++) {
+                            var br, pr;
+                            br = Math.floor(helpers.bound(random.realGauss(31, 11), 26, 70))
+                            pr = Math.floor(helpers.bound(random.realGauss(48, 17), 26, 90))
+                            baseRatings.push(br);
+                            pots.push(pr)
+                        }
+
                         goodNeutralBad = random.randInt(-1, 1);  // determines if this will be a good team or not
                         random.shuffle(pots);
                         for (n = 0; n < 14; n++) {
                             profile = profiles[random.randInt(0, profiles.length - 1)];
-                            agingYears = random.randInt(0, 13);
+                            agingYears = Math.floor(helpers.bound(random.realGauss(28, 4), 19, 35)) - 19;
                             draftYear = g.startingSeason - 1 - agingYears;
 
                             p = player.generate(t2, 19, profile, baseRatings[n], pots[n], draftYear, true, scoutingRank);
                             p = player.develop(p, agingYears, true);
-                            if (n < 5) {
-                                p = player.bonus(p, goodNeutralBad * random.randInt(0, 20));
-                            } else {
-                                p = player.bonus(p, 0);
-                            }
+                            // if (n < 5) {
+                            //     p = player.bonus(p, goodNeutralBad * random.randInt(0, 20));
+                            // } else {
+                            //     p = player.bonus(p, 0);
+                            // }
                             if (t2 === g.PLAYER.FREE_AGENT) {  // Free agents
                                 p = player.bonus(p, -15);
                             }
