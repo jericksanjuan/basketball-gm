@@ -2,7 +2,7 @@
  * @name views.negotiationList
  * @namespace List of re-signing negotiations in progress.
  */
-define(["dao", "globals", "ui", "core/freeAgents", "core/player", "lib/bluebird", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers"], function (dao, g, ui, freeAgents, player, Promise, $, ko, _, bbgmView, helpers) {
+define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "lib/bluebird", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers"], function (dao, g, ui, freeAgents, player, team, Promise, $, ko, _, bbgmView, helpers) {
     "use strict";
 
     var mapping;
@@ -70,9 +70,17 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "lib/bluebird"
                 players[i].mood = player.moodColorText(players[i]);
             }
 
-            return {
-                players: players
-            };
+            return team.getPayroll(null, g.userTid).get(0).then(function(payroll) {
+                return {
+                    players: players,
+                    payroll: payroll / 1000,
+                    capText: (g.salaryCap - payroll > 0) ? "below" : "above",
+                    salaryCap: g.salaryCap / 1000,
+                    luxuryPayroll: g.luxuryPayroll / 1000,
+                    taxText: (g.luxuryPayroll - payroll > 0) ? "below" : "above",
+                    luxuryTax: Math.max((payroll - g.luxuryPayroll), 0) * g.luxuryTax / 1000
+                };
+            });
         });
     }
 
