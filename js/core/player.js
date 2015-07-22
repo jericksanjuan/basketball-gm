@@ -191,7 +191,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
 
         // limit contract length if over 30
         if  (age > 30) {
-            year = Math.min( years , 3);
+            years = Math.min( years , 3);
         }
 
         // Randomize expiration for contracts generated at beginning of new game
