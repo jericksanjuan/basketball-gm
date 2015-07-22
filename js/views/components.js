@@ -122,6 +122,93 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "util/helpers"], function
                             key: "totals"
                         }
                     ];
+                } else if (fields[i] === "awardType") {
+                    options = [
+                        {
+                            val: "Won Championship",
+                            key: "champion"
+                        },
+                        {
+                            val: "Most Valuable Player",
+                            key: "mvp"
+                        },
+                        {
+                            val: "Finals MVP",
+                            key: "finals_mvp"
+                        },
+                        {
+                            val: "Defensive Player of the Year",
+                            key: "dpoy"
+                        },
+                        {
+                            val: "Sixth Man of the Year",
+                            key: "smoy"
+                        },
+                        {
+                            val: "Rookie of the Year",
+                            key: "roy"
+                        },
+                        {
+                            val: "First Team All-League",
+                            key: "first_team"
+                        },
+                        {
+                            val: "Second Team All-League",
+                            key: "second_team"
+                        },
+                        {
+                            val: "Third Team All-League",
+                            key: "third_team"
+                        },
+                        {
+                            val: "All-League",
+                            key: "all_league"
+                        },
+                        {
+                            val: "First Team All-Defensive",
+                            key: "first_def"
+                        },
+                        {
+                            val: "Second Team All-Defensive",
+                            key: "second_def"
+                        },
+                        {
+                            val: "Third Team All-Defensive",
+                            key: "third_def"
+                        },
+                        {
+                            val: "All-Defensive",
+                            key: "all_def"
+                        }
+
+                    ];
+                } else if (fields[i] === "eventType") {
+                    options = [
+                        {
+                            val: "All Types",
+                            key: "all"
+                        },
+                        {
+                            val: "Draft",
+                            key: "draft",
+                        },
+                        {
+                            val: "FA Signed",
+                            key: "freeAgent"
+                        },
+                        {
+                            val: "Resigned",
+                            key:  "reSigned"
+                        },
+                        {
+                            val: "Released",
+                            key: "released"
+                        },
+                        {
+                            val: "Trades",
+                            key: "trade"
+                        }
+                    ]
                 }
                 vm.fields().push({
                     id: fieldId,

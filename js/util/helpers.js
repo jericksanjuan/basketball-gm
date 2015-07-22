@@ -931,6 +931,11 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
         series[0][order + cid * 4].away.seed = teams[1].seed;
     }
 
+
+    function correctLinkLid(event) {
+        event.text = event.text.replace(/\/l\/\d+\//g, '/l/' + g.lid +'/');
+    }
+
     return {
         validateAbbrev: validateAbbrev,
         getAbbrev: getAbbrev,
@@ -965,6 +970,7 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
         updateMultiTeam: updateMultiTeam,
         plusMinus: plusMinus,
         seriesHomeAway: seriesHomeAway,
-        MultiSort: MultiSort
+        MultiSort: MultiSort,
+        correctLinkLid: correctLinkLid
     };
 });
