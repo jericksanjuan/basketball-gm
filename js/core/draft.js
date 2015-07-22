@@ -2,7 +2,7 @@
  * @name core.draft
  * @namespace The annual draft of new prospects.
  */
-define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "lib/bluebird", "util/eventLog", "util/helpers", "util/random"], function (dao, g, ui, finances, player, team, Promise, eventLog, helpers, random) {
+define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/random"], function (dao, g, ui, finances, player, team, Promise, _, eventLog, helpers, random) {
     "use strict";
 
     /**
@@ -108,6 +108,108 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
         });
     }
 
+    function lotteryLogTxt(tid, type, number) {
+        var txt = 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tid], g.season]) + '">' + g.teamNamesCache[tid] + '</a>';
+        if (type === 'chance') {
+            txt += " has a " + number + "% chance of getting the top overall pick of the "+ g.season +" draft.";
+        } else if ( type === 'movedup') {
+            txt += " moved up the lottery and will select " + helpers.ordinal(number) + " overall in the " + g.season + " draft.";
+        } else if ( type === 'moveddown') {
+            txt += " moved down the lottery and will select " + helpers.ordinal(number) + " overall in the " + g.season + " draft.";
+        } else if ( type === 'normal') {
+            txt += " will select " + helpers.ordinal(number) + " overall in the " + g.season + " draft.";
+        }
+        return txt;
+    }
+
+    function logAction(tid, txt) {
+        eventLog.add(null, {
+            type: "draft",
+            text: txt,
+            showNotification: tid === g.userTid,
+            pids: [],
+            tids: [tid]
+        });
+    }
+
+    function logLotteryChances(chances, teams, draftOrder) {
+        var i, chance, total, txt, origTm, tm;
+
+        for (i=0; i<chances.length; i++) {
+            origTm = teams[i].tid;
+            tm = draftOrder[origTm][1].tid;
+            txt = lotteryLogTxt(tm, 'chance', helpers.round(chances[i], 2));
+            logAction(tm, txt);
+        }
+    }
+
+    function logLotteryWinners(chances, teams, tm, origTm, pick) {
+        var idx, txt, i;
+        for (i=0; i< teams.length; i++) {
+            if (teams[i].tid === origTm) {
+                idx = i;
+                break;
+            }
+        }
+        if (chances[idx] < chances[pick-1]) {
+            txt = lotteryLogTxt(tm, 'movedup', pick);
+        } else if (chances[idx] > chances[pick-1]) {
+            txt = lotteryLogTxt(tm, 'moveddown', pick);
+        } else {
+            txt = lotteryLogTxt(tm, 'normal', pick);
+        }
+        logAction(tm, txt);
+    }
+
+    /**
+    * Divide the combinations between teams with tied records.
+    *
+    * If isFinal is true, the remainder value is distributed randomly instead
+    * of being set as a decimal value on the result.
+    */
+    function updateChances(chances, teams, isFinal) {
+        isFinal = isFinal || false;
+
+        var wps, tc, total, i, j, k, x, newVal, val, remainder, rdist;
+        wps =  _.countBy(teams, 'winp');
+        wps = _.pairs(wps);
+        wps = _.sortBy(wps, function(x) {return Number(x[0]);});
+        tc = 0;
+
+        for (k=0; k < wps.length; k++) {
+            val = wps[k][1];
+            if (val > 1) {
+                // Do not exceed 14, as the chances are only for lottery teams.
+                if (tc + val >= chances.length) {
+                    val -= (tc+val-chances.length);
+                }
+                total = chances.slice(tc, tc+val).reduce(function(a,b) {return a+b;});
+                remainder = (isFinal) ? total % val : 0;
+                newVal = (total - remainder)/val;
+
+                // Distribute remainder randomly.
+                rdist = [];
+                while (rdist.length < remainder) {
+                    x = random.randInt(tc, tc+val-1);
+                    if(rdist.indexOf(x) < 0) {
+                        rdist.push(x);
+                    }
+                }
+                for(i=tc,j=tc+val; i<j; i++) {
+                    chances[i] = newVal;
+                    if (rdist.indexOf(i) >= 0) {
+                        chances[i] += 1;
+                    }
+                }
+
+            }
+            tc += val;
+            if (tc >= chances.length) {
+                break;
+            }
+        }
+    }
+
     /**
      * Sets draft order and save it to the draftOrder object store.
      *
@@ -126,21 +228,45 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
             seasonAttrs: ["winp", "playoffRoundsWon"],
             season: g.season
         }).then(function (teams) {
-            var chances, draw, firstThree, i, pick;
+            var chances, draw, firstThree, i, pick, chancePct, chanceTotal, randValues;
+
+            /**
+             * http://www.nba.com/2015/news/04/17/2015-draft-order-of-selection-tiebreak-official-release/index.html
+             *
+             * The tiebreaker used after the lottery is random. Which is then reversed for the 2nd round.
+             */
+            randValues = _.shuffle(_.range(30));
+            for (i=0; i<teams.length; i++) {
+                teams[i].randVal = randValues[i];
+            }
 
             // Sort teams by making playoffs (NOT playoff performance) and winp, for first round
             teams.sort(function (a, b) {
+                var r;
+                r = 0;
                 if ((a.playoffRoundsWon >= 0) && !(b.playoffRoundsWon >= 0)) {
-                    return 1;
+                    r = 1;
                 }
                 if (!(a.playoffRoundsWon >= 0) && (b.playoffRoundsWon >= 0)) {
-                    return -1;
+                    r = -1;
                 }
-                return a.winp - b.winp;
+
+                r = (r === 0) ? a.winp - b.winp : r;
+                r = (r === 0) ? a.randVal - b.randVal : r;
+                return r;
             });
 
             // Draft lottery
             chances = [250, 199, 156, 119, 88, 63, 43, 28, 17, 11, 8, 7, 6, 5];
+
+            // console.log('chances', chances.slice());
+            updateChances(chances, teams, true);
+
+            // console.log('after chance', chances.slice(0));
+
+            chanceTotal = chances.reduce(function(a, b) {return a+b;});
+            chancePct = chances.map(function(c) {return (c/chanceTotal)* 100;});
+
             // cumsum
             for (i = 1; i < chances.length; i++) {
                 chances[i] = chances[i] + chances[i - 1];
@@ -155,6 +281,8 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
                     }
                 }
                 if (firstThree.indexOf(i) < 0) {
+                    // If one lottery winner, select after other tied teams;
+                    teams[i].randVal -= 30;
                     firstThree.push(i);
                 }
             }
@@ -179,6 +307,8 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
                     };
                 }
 
+                logLotteryChances(chancePct, teams, draftPicksIndexed);
+
                 draftOrder = [];
                 // First round - lottery winners
                 for (i = 0; i < firstThree.length; i++) {
@@ -189,9 +319,15 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
                         tid: tid,
                         originalTid: teams[firstThree[i]].tid
                     });
+
+                    logLotteryWinners(chancePct, teams, tid,
+                        teams[firstThree[i]].tid, i+1);
                 }
 
-                // First round - everyone else
+                /**
+                 * First round - everyone else
+                 *
+                 */
                 pick = 4;
                 for (i = 0; i < teams.length; i++) {
                     if (firstThree.indexOf(i) < 0) {
@@ -202,12 +338,24 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
                             tid: tid,
                             originalTid: teams[i].tid
                         });
+
+                        if(pick < 15) {
+                            logLotteryWinners(chancePct, teams, tid,
+                                teams[i].tid, pick);
+                        }
+
                         pick += 1;
                     }
                 }
 
-                // Sort teams by winp only, for second round
-                teams.sort(function (a, b) { return a.winp - b.winp; });
+                /**
+                 * sort by winp with reverse randVal for tiebreakers.
+                 */
+                teams.sort(function(a, b) {
+                    var r;
+                    r = a.winp - b.winp;
+                    return (r === 0) ? b.randVal - a.randVal : r;
+                });
 
                 // Second round
                 for (i = 0; i < teams.length; i++) {
