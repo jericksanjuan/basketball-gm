@@ -22,20 +22,36 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
             create: function (options) {
                 return options.data;
             }
+        },
+        avgs: {
+            create: function (options) {
+                return options.data;
+            }
         }
     };
 
     function updateTeams(inputs, updateEvents, vm) {
         if (updateEvents.indexOf("dbChange") >= 0 || (inputs.season === g.season && (updateEvents.indexOf("gameSim") >= 0 || updateEvents.indexOf("playerMovement") >= 0)) || inputs.season !== vm.season()) {
+            var statKeys = ["gp", "fg", "fga", "fgp", "tp", "tpa", "tpp", "ft", "fta", "ftp", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "ba", "pf", "pts", "oppPts", "diff"];
             return team.filter({
                 attrs: ["abbrev"],
                 seasonAttrs: ["won", "lost"],
-                stats: ["gp", "fg", "fga", "fgp", "tp", "tpa", "tpp", "ft", "fta", "ftp", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "ba", "pf", "pts", "oppPts", "diff"],
+                stats: statKeys,
                 season: inputs.season
             }).then(function (teams) {
+                var avgs, sumF, i, k;
+                avgs = {};
+                statKeys.splice(1, 0, "lost");
+                statKeys.splice(1, 0, "won")
+                sumF = function(a, b) { return a + b; };
+                for(i=0; i < statKeys.length; i++) {
+                    k = statKeys[i];
+                    avgs[k] = _.reduce(_.pluck(teams, k), sumF)/teams.length;
+                }
                 return {
                     season: inputs.season,
-                    teams: teams
+                    teams: teams,
+                    avgs: avgs
                 };
             });
         }
@@ -47,11 +63,14 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
         }).extend({throttle: 1});
 
         ko.computed(function () {
-            var season;
+            var season, data;
             season = vm.season();
-            ui.datatableSinglePage($("#team-stats"), 2, _.map(vm.teams(), function (t) {
+            data = _.map(vm.teams(), function (t) {
                 return ['<a href="' + helpers.leagueUrl(["roster", t.abbrev, season]) + '">' + t.abbrev + '</a>', String(t.gp), String(t.won), String(t.lost), helpers.round(t.fg, 1), helpers.round(t.fga, 1), helpers.round(t.fgp, 1), helpers.round(t.tp, 1), helpers.round(t.tpa, 1), helpers.round(t.tpp, 1), helpers.round(t.ft, 1), helpers.round(t.fta, 1), helpers.round(t.ftp, 1), helpers.round(t.orb, 1), helpers.round(t.drb, 1), helpers.round(t.trb, 1), helpers.round(t.ast, 1), helpers.round(t.tov, 1), helpers.round(t.stl, 1), helpers.round(t.blk, 1), helpers.round(t.ba, 1), helpers.round(t.pf, 1), helpers.round(t.pts, 1), helpers.round(t.oppPts, 1), helpers.round(t.diff, 1)];
-            }), {
+            });
+            var avgs = _.map(_.values(vm.avgs), function(x){return helpers.round(x, 1);})
+            data.push(["LEAGUE"].concat(avgs));
+            ui.datatableSinglePage($("#team-stats"), 2, data, {
                 rowCallback: function (row, data) {
                     // Show point differential in green or red for positive or negative
                     if (data[data.length - 1] > 0) {
