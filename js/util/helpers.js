@@ -882,6 +882,55 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
         return (arg > 0 ? "+" : "") + round(arg, d);
     }
 
+    /**
+     * Constructor for a sorter object. Use the objects sortF member as the sort
+     * function for the object list.
+     *
+     * @param {Array of String fields} sortBy sorting fields in order of application
+     */
+    function MultiSort(sortBy) {
+
+        sortBy = sortBy;
+
+        this.sortF = function (a, b) {
+            var result, sortT, rev, i;
+
+            for (i = 0; i < sortBy.length; i++) {
+                if (sortBy[i].indexOf("-") === 0) {
+                    rev = true;
+                    sortT = sortBy[i].slice(1);
+                } else {
+                    rev = false;
+                    sortT = sortBy[i];
+                }
+
+                result = (rev) ? a[sortT] - b[sortT] : b[sortT] - a[sortT];
+
+                if (result || i === sortBy.length - 1) {
+                    return result;
+                }
+            }
+        };
+    }
+
+    /**
+     * Determine HCA advantage for this matchup. Team with better winp, cwinp,
+     * ocwinp and diff will get HCA regardless of seeding.
+     */
+    function seriesHomeAway(series, teamsConf, seed1, seed2, order, cid) {
+        var teams, sortBy, sorter;
+        sortBy = ['winp', 'cwinp', 'ocwinp', 'diff'];
+        teams = [teamsConf[seed1-1], teamsConf[seed2-1]];
+        teams[0].seed =  seed1;
+        teams[1].seed = seed2;
+        sorter = new MultiSort(sortBy);
+        teams.sort(sorter.sortF);
+
+        series[0][order + cid * 4] = {home: teams[0], away: teams[1]};
+        series[0][order + cid * 4].home.seed = teams[0].seed;
+        series[0][order + cid * 4].away.seed = teams[1].seed;
+    }
+
     return {
         validateAbbrev: validateAbbrev,
         getAbbrev: getAbbrev,
@@ -914,6 +963,8 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
         checkNaNs: checkNaNs,
         gameScore: gameScore,
         updateMultiTeam: updateMultiTeam,
-        plusMinus: plusMinus
+        plusMinus: plusMinus,
+        seriesHomeAway: seriesHomeAway,
+        MultiSort: MultiSort
     };
 });

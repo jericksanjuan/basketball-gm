@@ -509,7 +509,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
      * @return {Promise.(Object|Array.<Object>)} Filtered team object or array of filtered team objects, depending on the inputs.
      */
     function filter(options) {
-        var filterAttrs, filterSeasonAttrs, filterStats, filterStatsPartial;
+        var filterAttrs, filterSeasonAttrs, filterStats, filterStatsPartial, _checkSort, _assureSort;
 
         if (arguments[1] !== undefined) { throw new Error("No cb should be here"); }
 
@@ -522,6 +522,48 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         options.totals = options.totals !== undefined ? options.totals : false;
         options.playoffs = options.playoffs !== undefined ? options.playoffs : false;
         options.sortBy = options.sortBy !== undefined ? options.sortBy : "";
+
+
+        /**
+         * check if field is in sortBy
+         */
+        _checkSort = function(sortBy, field) {
+            var cond, rev;
+            rev = '-' + field;
+            cond = Array.isArray(sortBy) && (sortBy.indexOf(field) > -1 || sortBy.indexOf(rev) > -1);
+            cond = cond || (sortBy === field || sortBy === rev);
+            return cond;
+        };
+
+
+        /**
+         * Assure needed fields are available for sorting.
+         */
+        _assureSort = function(field, type, addFields) {
+            type = type || 'seasonAttrs';
+            addFields = addFields || [];
+            var cond;
+
+            _.each(addFields, function(f) {
+                if (_.isArray(f)) {
+                    options[f[1]].push(f[0]);
+                } else{
+                    options[type].push(f);
+                }
+            });
+
+            cond = _checkSort(options.sortBy, field);
+            if (cond) {
+                options[type].push(field);
+            }
+
+        };
+
+        _assureSort('winp', null, ['won', 'lost']);
+        _assureSort('dwinp', null, ['wonDiv', 'lostDiv', ['did', 'attrs']]);
+        _assureSort('cwinp', null, ['wonConf', 'lostConf']);
+        _assureSort('ocwinp', null, ['won', 'lost', 'wonConf', 'lostConf']);
+        _assureSort('diff', 'stats', ['pts', 'oppPts']);
 
         // Copys/filters the attributes listed in options.attrs from p to fp.
         filterAttrs = function (ft, t, options) {
@@ -539,6 +581,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                     ft[options.attrs[j]] = t[options.attrs[j]];
                 }
             }
+
         };
 
         // Copys/filters the seasonal attributes listed in options.seasonAttrs from p to fp.
@@ -567,6 +610,24 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                         ft.winp = 0;
                         if (tsa.won + tsa.lost > 0) {
                             ft.winp = tsa.won / (tsa.won + tsa.lost);
+                        }
+                    } else if(options.seasonAttrs[j] === 'dwinp') {
+                        ft.dwinp = 0;
+                        if (tsa.wonDiv + tsa.lostDiv > 0) {
+                            ft.dwinp = tsa.wonDiv /  (tsa.wonDiv + tsa.lostDiv);
+                        }
+                    } else if(options.seasonAttrs[j] === 'cwinp') {
+                        ft.cwinp = 0;
+                        if (tsa.wonConf + tsa.lostConf > 0) {
+                            ft.cwinp = tsa.wonConf / (tsa.wonConf + tsa.lostConf);
+                        }
+                    } else if(options.seasonAttrs[j] === 'ocwinp') {
+                        ft.ocwinp = 0;
+                        if (tsa.won + tsa.lost > 0) {
+                            var othWon, othLost;
+                            othWon = Math.max(tsa.won - tsa.wonConf, 0);
+                            othLost = Math.max(tsa.lost - tsa.lostConf, 0);
+                            ft.ocwinp = othWon / (othWon + othLost);
                         }
                     } else if (options.seasonAttrs[j] === "att") {
                         ft.att = 0;
@@ -710,7 +771,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         };
 
         return dao.teams.getAll({ot: options.ot, key: options.tid}).then(function (t) {
-            var ft, fts, i, returnOneTeam, savePayroll, sortBy;
+            var ft, fts, i, returnOneTeam, savePayroll, sortBy, getDrank, fakeWinp, breakDivTie, sorter;
 
             // t will be an array of g.numTeams teams (if options.tid is null) or an array of 1 team. If 1, then we want to return just that team object at the end, not an array of 1 team.
             returnOneTeam = false;
@@ -728,20 +789,71 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                 fts.push(ft);
             }
 
+            /**
+             * Set the drank attribute of the team object.
+             * The ff. values are set for drank
+             * 1 = if team is division leader
+             * 1/(1 x tied_teams) = if there are teams in the division tied for the lead
+             * 0 = if team is not the division leader.
+             */
+            getDrank = function(t) {
+                var tmax, ft, count;
+                ft = _.filter(fts, function(x) {return x.did === t.did;});
+                tmax = _.max(_.pluck(ft, 'winp'));
+                count = _.countBy(_.pluck(ft, 'winp'));
+                t.drank = Number(t.winp === tmax)/(count[tmax]);
+            };
+
+            /**
+             * Break ties to determine the division winner.
+             */
+            breakDivTie = function(teams) {
+                if (teams.length !== 0 ) {
+                    var sortBy, s;
+                    sortBy = ['dwinp', 'cwinp', 'ocwinp', 'diff'];
+                    s = new helpers.MultiSort(sortBy);
+                    teams.sort(s.sortF);
+                    teams.map(function(t) {t.drank = 0;});
+                    teams[0].drank = 1;
+                }
+            };
+
+            /**
+             * Assure that the division leaders are in the top 4. Set a fake
+             * winpp attribute that is the average of the 3rd and 4th highest
+             * ranked team in the conference.
+             */
+            fakeWinp = function(t) {
+                var ft;
+                ft = _.pluck(_.filter(fts, function(x) {return x.cid === t.cid;}), 'winp');
+                ft = ft.sort(function(a, b) { return b - a;});
+                if (t.drank && t.winp < ft[3]) {
+                    t.winpp = (ft[2] + ft[3])/2.0;
+                } else {
+                    t.winpp = t.winp;
+                }
+            };
+
             if (Array.isArray(options.sortBy)) {
                 // Sort by multiple properties
                 sortBy = options.sortBy.slice();
-                fts.sort(function (a, b) {
-                    var result;
 
-                    for (i = 0; i < sortBy.length; i++) {
-                        result = (sortBy[i].indexOf("-") === 1) ? a[sortBy[i]] - b[sortBy[i]] : b[sortBy[i]] - a[sortBy[i]];
-
-                        if (result || i === sortBy.length - 1) {
-                            return result;
-                        }
+                /**
+                 * If sorting by division rank (drank), the division leaders are
+                 * assured of a top 4 seeding. Sort using a fake winpp field
+                 * instead of winp.
+                 */
+                if (sortBy.indexOf('drank') > -1) {
+                    if (sortBy.indexOf('winp') > -1) {
+                        sortBy.splice(sortBy.indexOf('winp'), 1);
                     }
-                });
+
+                    fts.map(function(t) {getDrank(t); fakeWinp(t);});
+                    breakDivTie(fts.filter(function(t) {return t.drank > 0 && t.drank < 1;}));
+                    sortBy = ['winpp',].concat(sortBy);
+                }
+                sorter = new helpers.MultiSort(sortBy);
+                fts.sort(sorter.sortF);
             } else if (options.sortBy === "winp") {
                 // Sort by winning percentage, descending
                 fts.sort(function (a, b) { return b.winp - a.winp; });
