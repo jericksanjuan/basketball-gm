@@ -387,7 +387,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         index: "pid, season, tid",
                         key: IDBKeyRange.bound([p.pid], [p.pid, ''])
                     }).then(function (playerStats) {
-                        var age, excessAge, excessPot, pot;
+                        var age, excessAge, excessPot, pot, randval;
 
                         age = g.season - p.born.year;
                         pot = p.ratings[p.ratings.length - 1].pot;
@@ -399,12 +399,20 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                                     excessAge = (age - 34) / 20;  // 0.05 for each year beyond 34
                                 }
                                 excessPot = (40 - pot) / 50;  // 0.02 for each potential rating below 40 (this can be negative)
-                                if (excessAge + excessPot + random.gauss(0, 1) > 0) {
+                                randval = helpers.bound(random.realGauss(0, 1), -1, 4); // bounding the negative end,
+                                if (excessAge + excessPot + randval > 0) {              // increases the likelihood of retirement.
                                     p = player.retire(tx, p, playerStats);
                                     update = true;
                                 }
                             }
+                        } else {
+                            // Very small chance of an active retiring.
+                            if (Math.random() < 0.0000001 ) {
+                                p = player.retire(tx, p, playerStats);
+                                update = true;
+                            }
                         }
+
 
                         // Update "free agent years" counter and retire players who have been free agents for more than one years
                         if (p.tid === g.PLAYER.FREE_AGENT) {
