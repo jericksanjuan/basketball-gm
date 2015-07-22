@@ -442,11 +442,7 @@ define(["dao", "db", "globals", "ui", "core/draft", "core/finances", "core/phase
 
                             p = player.generate(t2, 19, profile, baseRatings[n], pots[n], draftYear, true, scoutingRank);
                             p = player.develop(p, agingYears, true);
-                            // if (n < 5) {
-                            //     p = player.bonus(p, goodNeutralBad * random.randInt(0, 20));
-                            // } else {
-                            //     p = player.bonus(p, 0);
-                            // }
+
                             if (t2 === g.PLAYER.FREE_AGENT) {  // Free agents
                                 p = player.bonus(p, -15);
                             }
