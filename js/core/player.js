@@ -156,10 +156,10 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
             if (proExp <= 6) {
                 maxAmount *= 0.725;  // min: 500, max: 14500
             } else if (proExp >= 7 && proExp <= 9) {
-                minAmount *= 2; // min: 1000
+                minAmount = 900; // min: 1000
                 maxAmount *= 0.875;  // max: 17500
             } else if (proExp >= 10) {
-                minAmount *= 3;  // min: 1500, max: 20000
+                minAmount = 1400;  // min: 1500, max: 20000
             }
         } else {
             age = p.draft.year - p.born.year
@@ -221,7 +221,8 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
 
         amount = 50 * Math.round(amount / 50);  // Make it a multiple of 50k
 
-        return {amount: amount, exp: expiration};
+        return {amount: amount, exp: expiration,
+            is_min: amount === minAmount, is_max: amount === maxAmount };
     }
 
     /**
