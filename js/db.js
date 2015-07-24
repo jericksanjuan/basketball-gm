@@ -915,101 +915,6 @@ define(["dao", "globals", "lib/bluebird", "lib/davis", "lib/underscore", "util/e
                     };
                 }());
             }
-            if (event.oldVersion <= 16) {
-                (function () {
-                    tx.objectStore("teams").openCursor().onsuccess = function (event) {
-                        var cursor, i, t, update;
-
-                        cursor = event.target.result;
-                        update = false;
-
-                        if (cursor) {
-                            t = cursor.value;
-
-                            for (i = 0; i < t.seasons.length; i++) {
-                                t.seasons[i].revenues.luxuryTaxShare = {amount: 0, rank: 15.5};
-                            }
-
-                            cursor.update(t);
-                            cursor.continue();
-                        }
-                    };
-                }());
-            }
-            if (event.oldVersion <= 17) {
-                (function () {
-                    tx.objectStore("games").openCursor().onsuccess = function (event) {
-                        var cursor, game, i, j, update;
-
-                        cursor = event.target.result;
-                        update = false;
-
-                        if (cursor) {
-                            game = cursor.value;
-
-                            // set BA, +/- to zero for boxscores
-                            for (i = 0; i < game.teams.length; i++) {
-                                for (j = 0; j < game.teams[i].players.length; j++) {
-                                    if (game.teams[i].players[j].pfd === undefined) {
-                                        game.teams[i].players[j].pfd = 0;
-                                        update = true;
-                                    }
-                                }
-                            }
-
-                            if (game.teams[0].pfd === undefined) {
-                                game.teams[0].pfd = 0;
-                                game.teams[1].pfd = 0;
-                                update = true;
-                            }
-
-                            if (update) { cursor.update(game); }
-                            cursor.continue();
-                        }
-                    };
-
-                    // set BA, +/- to zero for player stats
-                    tx.objectStore("playerStats").openCursor().onsuccess = function (event) {
-                        var cursor, ps, update;
-
-                        cursor = event.target.result;
-                        update = false;
-
-                        if (cursor) {
-                            ps = cursor.value;
-
-                            if (!ps.hasOwnProperty("pfd")) {
-                                ps.pfd = 0;
-                                update = true;
-                            }
-
-                            if (update) { cursor.update(ps); }
-                            cursor.continue();
-                        }
-                    };
-
-                    // set BA to zero for team stats, +/- already handled
-                    tx.objectStore("teams").openCursor().onsuccess = function (event) {
-                        var cursor, i, t, update;
-
-                        cursor = event.target.result;
-                        update = false;
-
-                        if (cursor) {
-                            t = cursor.value;
-                            for (i = 0; i < t.stats.length; i++) {
-                                if (!t.stats[i].hasOwnProperty("pfd")) {
-                                    t.stats[i].pfd = 0;
-                                    update = true;
-                                }
-                            }
-
-                            if (update) { cursor.update(t); }
-                            cursor.continue();
-                        }
-                    };
-                }());
-            }
         });
     }
 
@@ -1018,7 +923,7 @@ define(["dao", "globals", "lib/bluebird", "lib/davis", "lib/underscore", "util/e
             var request;
 
 //        console.log('Connecting to database "league' + lid + '"');
-            request = indexedDB.open("league" + lid, 18);
+            request = indexedDB.open("league" + lid, 16);
             request.onerror = function (event) {
                 reject(event.target.error);
             };

@@ -13,10 +13,9 @@ define(["dao", "globals", "lib/underscore"], function (dao, g, _) {
      * @return {Promise}
      */
     function assessPayrollMinLuxury(tx) {
+        var amount, collectedTax, distribute;
         tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
-        var collectedTax, amount, distribute;
         collectedTax = 0;
-        distribute = 0;
 
         return require("core/team").getPayrolls(tx).then(function (payrolls) {
             // Update teams object store
@@ -25,7 +24,7 @@ define(["dao", "globals", "lib/underscore"], function (dao, g, _) {
                 callback: function (t) {
                     var s;
 
-                    s = t.seasons.length - 1;  // Relevant row is the last one
+                    s = t.seasons.length - 1; // Relevant row is the last one
 
                     // Store payroll
                     t.seasons[s].payrollEndOfSeason = payrolls[t.tid];
@@ -43,22 +42,32 @@ define(["dao", "globals", "lib/underscore"], function (dao, g, _) {
 
                     return t;
                 }
-            }).then(function() {
+            }).then(function () {
                 var payteams;
-                payteams = payrolls.filter(function(x) { return x <= g.salaryCap; });
-                if (payteams.length > 0) {
-                    distribute = (collectedTax * 0.5)/payteams.length;
+                payteams = payrolls.filter(function (x) {
+                    return x <= g.salaryCap;
+                });
+                if (payteams.length > 0 && collectedTax > 0) {
+                    distribute = (collectedTax * 0.5) / payteams.length;
                     return dao.teams.iterate({
                         ot: tx,
-                        callback: function(t) {
+                        callback: function (t) {
                             var s;
                             s = t.seasons.length - 1;
 
                             if (payrolls[t.tid] <= g.salaryCap) {
-                                t.seasons[s].revenues.luxuryTaxShare.amount = distribute;
+                                t.seasons[s].revenues.luxuryTaxShare = {
+                                    amount: distribute,
+                                    rank: 15.5
+                                };
                                 t.seasons[s].cash += distribute;
-                                return t;
+                            } else {
+                                t.seasons[s].revenues.luxuryTaxShare = {
+                                    amount: 0,
+                                    rank: 15.5
+                                };
                             }
+                            return t;
                         }
                     });
                 }
@@ -111,7 +120,9 @@ define(["dao", "globals", "lib/underscore"], function (dao, g, _) {
             }
         };
 
-        return dao.teams.getAll({ot: ot}).then(function (teams) {
+        return dao.teams.getAll({
+            ot: ot
+        }).then(function (teams) {
             var budgetsByItem, budgetsByTeam, expensesByItem, expensesByTeam, i, revenuesByItem, revenuesByTeam, s;
 
             if (types.indexOf("budget") >= 0) {
@@ -168,7 +179,7 @@ define(["dao", "globals", "lib/underscore"], function (dao, g, _) {
     function getRankLastThree(t, category, item) {
         var s;
 
-        s = t.seasons.length - 1;  // Most recent season index
+        s = t.seasons.length - 1; // Most recent season index
         if (s > 1) {
             // Use three seasons if possible
             return (t.seasons[s][category][item].rank + t.seasons[s - 1][category][item].rank + t.seasons[s - 2][category][item].rank) / 3;
