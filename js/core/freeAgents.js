@@ -80,7 +80,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     if (numPlayersOnRoster < 15) {
                         for (i = 0; i < players.length; i++) {
                             // Don't sign minimum contract players to fill out the roster
-                            if (players[i].contract.amount + payroll <= g.salaryCap || (players[i].contract.amount === g.minContract && numPlayersOnRoster < 13)) {
+                            if (players[i].contract.amount + payroll <= g.salaryCap || (players[i].contract.is_min && numPlayersOnRoster < 13)) {
                                 p = players[i];
                                 p.tid = tid;
                                 if (g.phase <= g.PHASE.PLAYOFFS) { // Otherwise, not needed until next season

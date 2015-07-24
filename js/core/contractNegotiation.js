@@ -45,7 +45,11 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                     }
 
                     // Initial player proposal;
-                    playerAmount = freeAgents.amountWithMood(p.contract.amount, p.freeAgentMood[g.userTid]);
+                    if(p.contract.is_min) {
+                        playerAmount = p.contract.amount;
+                    } else {
+                        playerAmount = freeAgents.amountWithMood(p.contract.amount, p.freeAgentMood[g.userTid]);
+                    }
                     playerYears = p.contract.exp - g.season;
                     // Adjust to account for in-season signings;
                     if (g.phase <= g.PHASE.AFTER_TRADE_DEADLINE) {
@@ -60,7 +64,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                         pid: pid,
                         tid: tid,
                         team: {amount: playerAmount, years: playerYears},
-                        player: {amount: playerAmount, years: playerYears},
+                        player: {amount: playerAmount, years: playerYears,
+                            is_max: p.contract.is_max, is_min: p.contract.is_min},
                         orig: {amount: playerAmount, years: playerYears},
                         resigning: resigning
                     };
@@ -142,6 +147,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 if (negotiation.orig.amount >= 18000) {
                     // Expensive guys don't negotiate
                     negotiation.player.amount *= 1 + 0.05 * mood;
+                } else if (negotiation.player.is_min) {
+                    negotiation.player.amount = negotiation.orig.amount;
                 } else {
                     if (teamYears === negotiation.player.years) {
                         // Team and player agree on years, so just update amount
@@ -280,10 +287,15 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             team.getPayroll(null, g.userTid).get(0)
         ]).spread(function (negotiation, payroll) {
             var tx;
-
+            var min1, min2, min3;
+            min1 = !negotiation.player.is_min;
+            min2 = negotiation.player.is_min && negotiation.player.amount > negotiation.orig.amount;
+            min3 = negotiation.player.is_min && negotiation.player.amount < negotiation.orig.amount;
+            console.log(min1, min2, min3);
+            console.log(negotiation);
             // If this contract brings team over the salary cap, it's not a minimum;
             // contract, and it's not re-signing a current player, ERROR!
-            if (!negotiation.resigning && (payroll + negotiation.player.amount > g.salaryCap && negotiation.player.amount !== g.minContract)) {
+            if (!negotiation.resigning && (payroll + negotiation.player.amount > g.salaryCap && min1 || min2 || min3)) {
                 return "This contract would put you over the salary cap. You cannot go over the salary cap to sign free agents to contracts higher than the minimum salary. Either negotiate for a lower contract or cancel the negotiation.";
             }
 
