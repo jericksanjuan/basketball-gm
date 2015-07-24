@@ -1213,7 +1213,7 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
         updateMultiTeam: updateMultiTeam,
         plusMinus: plusMinus,
         seriesHomeAway: seriesHomeAway,
-        correctLinkLid: correctLinkLid
+        correctLinkLid: correctLinkLid,
         multiSort: multiSort
     };
 });
