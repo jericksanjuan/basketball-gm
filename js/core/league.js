@@ -437,7 +437,7 @@ define(["dao", "db", "globals", "ui", "core/draft", "core/finances", "core/phase
                         random.shuffle(pots);
                         for (n = 0; n < 14; n++) {
                             profile = profiles[random.randInt(0, profiles.length - 1)];
-                            agingYears = Math.floor(helpers.bound(random.realGauss(28, 4), 19, 35)) - 19;
+                            agingYears = Math.floor(helpers.bound(random.realGauss(28, 3), 19, 35)) - 19;
                             draftYear = g.startingSeason - 1 - agingYears;
 
                             p = player.generate(t2, 19, profile, baseRatings[n], pots[n], draftYear, true, scoutingRank);
@@ -466,13 +466,17 @@ define(["dao", "db", "globals", "ui", "core/draft", "core/finances", "core/phase
                                 if (p.tid === g.PLAYER.FREE_AGENT) {
                                     player.addToFreeAgents(tx, p, null, baseMoods);
                                 } else {
-                                    dao.players.put({ot: tx, value: p}).then(function (pid) {
-                                        // When adding a player, this is the only way to know the pid
-                                        p.pid = pid;
+                                    if (p.value < 30) {
+                                        player.addToFreeAgents(tx, p, null, baseMoods);
+                                    } else {
+                                        dao.players.put({ot: tx, value: p}).then(function (pid) {
+                                            // When adding a player, this is the only way to know the pid
+                                            p.pid = pid;
 
-                                        // Needs pid, so must be called after put. It's okay, statsTid was already set above
-                                        p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
-                                    });
+                                            // Needs pid, so must be called after put. It's okay, statsTid was already set above
+                                            p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
+                                        });
+                                    }
                                 }
                             });
                         }
