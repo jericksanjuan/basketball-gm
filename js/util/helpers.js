@@ -1176,7 +1176,7 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
 
 
     function correctLinkLid(event) {
-        event.text = event.text.replace(/\/l\/\d+\//g, '/l/' + g.lid +'/');
+        event.text = event.text.replace(/\/l\/\d+\//g, '/l/' + g.lid + '/');
     }
 
     return {
