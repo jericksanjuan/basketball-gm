@@ -154,15 +154,16 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                     for (i = 0; i < keys.length; i++) {
                         teamStats.oppStats[keys[i]] += results.team[t2].stat[keys[i]];
                     }
+                    teamStats.oppStats.gp += 1;
                     teamStats.oppStats.trb += results.team[t2].stat.orb + results.team[t2].stat.drb
                 } else {
                     teamStats['oppStats']  = {};
                     for (i = 0; i < keys.length; i++) {
                         teamStats.oppStats[keys[i]] = results.team[t2].stat[keys[i]];
                     }
-                    teamStats.oppStats.trb += results.team[t2].stat.orb + results.team[t2].stat.drb
+                    teamStats.oppStats.gp = 1;
+                    teamStats.oppStats.trb = results.team[t2].stat.orb + results.team[t2].stat.drb
                 }
-                console.log(teamStats);
 
                 if (teamSeason.lastTen.length === 10 && g.phase !== g.PHASE.PLAYOFFS) {
                     teamSeason.lastTen.pop();

@@ -515,6 +515,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         options.attrs = options.attrs !== undefined ? options.attrs : [];
         options.seasonAttrs = options.seasonAttrs !== undefined ? options.seasonAttrs : [];
         options.stats = options.stats !== undefined ? options.stats : [];
+        options.oppStats = options.oppStats !== undefined ? options.oppStats : [];
         options.totals = options.totals !== undefined ? options.totals : false;
         options.playoffs = options.playoffs !== undefined ? options.playoffs : false;
         options.sortBy = options.sortBy !== undefined ? options.sortBy : "";
@@ -603,7 +604,6 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         // Filters s by stats (which should be options.stats) into ft. This is to do one season of stats filtering.
         filterStatsPartial = function (ft, s, stats) {
             var j;
-
             if (s !== undefined && s.gp > 0) {
                 for (j = 0; j < stats.length; j++) {
                     if (stats[j] === "gp") {
@@ -671,7 +671,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
 
         // Copys/filters the stats listed in options.stats from p to fp.
         filterStats = function (ft, t, options) {
-            var i, j, ts;
+            var i, j, ots, ts;
 
             if (options.stats.length > 0) {
                 if (options.season !== null) {
@@ -695,13 +695,23 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
 
             if (ts !== undefined && ts.length >= 0) {
                 ft.stats = [];
+                ft.oppStats = [];
                 // Multiple seasons
                 for (i = 0; i < ts.length; i++) {
                     ft.stats.push(filterStatsPartial({}, ts[i], options.stats));
+                    if (options.oppStats.length > 0 && ts[i].hasOwnProperty('oppStats')) {
+                        ots = filterStatsPartial({}, ts[i].oppStats, options.oppStats);
+                        ft.oppStats.push(ots);
+                    }
                 }
             } else {
                 // Single seasons - merge stats with root object
                 ft = filterStatsPartial(ft, ts, options.stats);
+                if (options.oppStats.length > 0 && ts.hasOwnProperty('oppStats')) {
+                    ots = {};
+                    filterStatsPartial(ots, ts.oppStats, options.oppStats);
+                    ft.oppStats = ots;
+                }
             }
         };
 
