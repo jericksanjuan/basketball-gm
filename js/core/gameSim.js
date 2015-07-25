@@ -644,12 +644,6 @@ define(["lib/underscore", "util/helpers", "util/random"], function (_, helpers, 
         // plus factor base on opponent's defense;
         oppDef = (dRatings.defensePerimeter - dRatings.defenseInterior) * 0.7;
 
-        if (this.oppDef) {
-            this.oppDef = (this.oppDef + oppDef)/2;
-        } else {
-            this.oppDef = oppDef;
-        }
-
         goInside = 1 - goInside/total;
         goInside = Math.random() > (goInside - synergyFactor - oppDef);
 
