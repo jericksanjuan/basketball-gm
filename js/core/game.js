@@ -149,14 +149,18 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                 teamStats.trb += results.team[t1].stat.orb + results.team[t1].stat.drb;
                 teamStats.oppPts += results.team[t2].stat.pts;
                 teamStats.ba += results.team[t2].stat.blk;
-                if (teamStats.hasOwnProperty('optrb')) {
-                    teamStats.oporb +=  results.team[t2].stat.orb;
-                    teamStats.opdrb +=  results.team[t2].stat.drb;
-                    teamStats.optrb +=  results.team[t2].stat.orb + results.team[t2].stat.drb;
+
+                if (teamStats.hasOwnProperty('oppStats')) {
+                    for (i = 0; i < keys.length; i++) {
+                        teamStats.oppStats[keys[i]] += results.team[t2].stat[keys[i]];
+                    }
+                    teamStats.oppStats.trb += results.team[t2].stat.orb + results.team[t2].stat.drb
                 } else {
-                    teamStats.oporb =  results.team[t2].stat.orb;
-                    teamStats.opdrb =  results.team[t2].stat.drb;
-                    teamStats.optrb =  results.team[t2].stat.orb + results.team[t2].stat.drb;
+                    teamStats['oppStats']  = {};
+                    for (i = 0; i < keys.length; i++) {
+                        teamStats.oppStats[keys[i]] = results.team[t2].stat[keys[i]];
+                    }
+                    teamStats.oppStats.trb += results.team[t2].stat.orb + results.team[t2].stat.drb
                 }
                 console.log(teamStats);
 
@@ -318,12 +322,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
             for (i = 0; i < keys.length; i++) {
                 gameStats.teams[t][keys[i]] = results.team[t].stat[keys[i]];
             }
-            opt = 1 - t;
             gameStats.teams[t].trb = results.team[t].stat.orb + results.team[t].stat.drb;
-            gameStats.teams[t].oporb = results.team[opt].stat.orb;
-            gameStats.teams[t].opdrb = results.team[opt].stat.drb;
-            gameStats.teams[t].optrb = results.team[opt].stat.orb + results.team[opt].stat.drb;
-            console.log('game', gameStats);
 
             keys.unshift("gs"); // Also record starters, in addition to other stats
             keys.push("pm");
