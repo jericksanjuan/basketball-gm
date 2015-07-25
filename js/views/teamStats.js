@@ -34,7 +34,6 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
                 // oppStats: ["trb", "tov"],
                 season: inputs.season
             }).then(function (teams) {
-                console.log(teams);
                 return {
                     season: inputs.season,
                     teams: teams
