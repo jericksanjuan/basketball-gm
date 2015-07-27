@@ -887,6 +887,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
 
     return {
         play: play,
-        loadTeam: loadTeam
+        loadTeam: loadTeam,
+        makeComposite: makeComposite
     };
 });

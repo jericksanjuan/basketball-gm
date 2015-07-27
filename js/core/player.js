@@ -537,10 +537,12 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
                     baseMoods[i] += 0.5 * (1 - teams[i].seasons[s].hype);
 
                     // Facilities
-                    baseMoods[i] += 0.1 * (finances.getRankLastThree(teams[i], "expenses", "facilities") - 1) / (g.numTeams - 1);
+                    baseMoods[i] += 0.2 * (finances.getRankLastThree(teams[i], "expenses", "facilities") - 1) / (g.numTeams - 1);
+                    baseMoods[i] += 0.1 * (finances.getRankLastThree(teams[i], "expenses", "coaching") - 1) / (g.numTeams - 1);
+                    baseMoods[i] += 0.1 * (finances.getRankLastThree(teams[i], "expenses", "health") - 1) / (g.numTeams - 1);
 
                     // Population
-                    baseMoods[i] += 0.2 * (1 - teams[i].seasons[s].pop / 10);
+                    baseMoods[i] += 0.1 * (1 - teams[i].seasons[s].pop / 10);
 
                     // Randomness
                     baseMoods[i] += random.uniform(-0.2, 0.2);

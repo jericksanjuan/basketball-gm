@@ -5,56 +5,156 @@
 define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, game, Promise, _, eventLog, helpers, lock, random) {
     "use strict";
 
-    function makeOffer(tx, t, p) {
-        tx = dao.tx(["players", "playerStats", "releasedPlayers", "teams"], "readwrite", tx);
-        /**
-         * Get all teams and free agents
-         * team looks for n players where n is number of slot + 1 (?)
-         * team makes contract offer to player according to their perceived value of
-         *   the player (fuzz by scouting rank). Attach to player and team dict.
-         *
-         *
-         */
+    /**
+     * Exclude fields in searching for players.
+     * @param  {object} compositeRatings objects with keys and values for composite player ratings.
+     * @return {Array.string} fields to be included
+     */
+    function teamNeeds(compositeRatings) {
+        var cr, notInclude;
+        notInclude = ['pace', 'usage', 'turnovers', 'fouling', 'endurance', 'shootingFT']
+        cr = _.omit(compositeRatings, notInclude);
+        cr = _.pairs(cr).sort(function(a, b) {return a[1] - b[1]});
+        return _.keys(_.object(cr));
     }
-
-    function decideContract(p) {
-        /**
-         * Player decides today to sign  with team with highest offer grade.
-         */
-
-    }
-
-
-    function tickFreeAgencyDay(tx) {
-        // return Promise.getAll([
-        //     dao.teams.getAll({ot: tx}),
-        //     dao.players.getAll({ot: tx, index: "tid", key: g.PLAYER.FREE_AGENT})
-        // ])
-        // .spread(function(tms, plr) {
-        //     var i, offers;
-        //     tms = tms.filter()
-        // })
-    }
-
 
     /**
-     * Iterate on all teams to save info
-     *
-     * salary situation
-     * roster space
-     * team synergy
-     * team composite rating (first 5 to 8th)
-     * team stats (identify need)
-     * fuzz value!
+     * Group the team needs, at max 2 from the same category only.
+     * @param  {Array.string} needs fields to be included
+     * @return {Array.string}       final fields to include, max length 5.
+     */
+    function groupNeeds(needs) {
+        var big, diff, defender, i, needsCopy, playmaker, shooter, tcount, ttype, wing, x;
+        big = ['shootingLowPost', 'rebounding'];
+        shooter = ['shootingMidRange', 'shootingThreePointer'];
+        wing = ['athleticism', 'shootingAtRim'];
+        playmaker = ['dribbling', 'passing'];
+        defender = ['defense', 'defenseInterior', 'defensePerimeter', 'stealing', 'blocking'];
+
+        tcount = [[], [], [], [], []];
+        needsCopy = needs.slice();
+        ttype = _.union(big, shooter, wing, playmaker, defender);
+
+        for (i = 0; i < needs.length; i++) {
+            x = ttype.indexOf(needs[i]);
+            x = Math.min(Math.floor(x/2), 4);
+            tcount[x].push(needs[i]);
+        }
+        for (i = 0; i < tcount.length; i++) {
+            tcount[i] = tcount[i].slice(0, 2);
+        }
+        tcount = _.flatten(tcount);
+        diff = _.difference(needs, tcount);
+        return _.difference(needsCopy, diff).slice(0,5);
+    }
+
+    function makeOffer(t, players) {
+        var fp, needs, i, offers, pp, rosterSpace, salaryOffered, salarySpace, toRemove;
+        return Promise.try(function() {
+            offers = [];
+            fp = helpers.deepCopy(players);
+
+            console.log(t.region, t.fa.salarySpace);
+            needs = teamNeeds(t.fa.compositeRating);
+            needs = groupNeeds(needs);
+            salarySpace = t.fa.salarySpace;
+            rosterSpace = t.fa.rosterSpace;
+            for (i = 0; i < needs.length; i++) {
+                // filter by criteria and salary
+                pp = fp.filter(function(p) {
+                    return p.compositeRating[needs[i]] > t.fa.compositeRating[needs[i]] &&
+                        p.contract.amount <= salarySpace;
+                });
+                // sort by rating and salary value.
+                pp = pp.sort(function(a, b) {
+                    var r = 0;
+                    r = b.compositeRating[needs[i]] -  a.compositeRating[needs[i]];
+                    return (r === 0) ? b.contract.amount/b.value - a.contract.amount/a.value : r;
+                });
+                if (pp.length > 0) {
+                    offers.push({
+                        tid: t.tid,
+                        pid: pp[0].pid,
+                        amount: pp[0].contract.amount,
+                        exp: pp[0].contract.exp
+                    })
+                    salarySpace -= pp[0].contract.amount;
+                    rosterSpace -= 1;
+                    if (rosterSpace === 0) {
+                        i = needs.length;
+                    }
+                }
+            }
+            return offers;
+        });
+    }
+
+    function decideContract(tx, p, maxSalarySpace) {
+        return Promise.try(function() {
+            if (p.contract.amount > maxSalarySpace) {
+                // accept reduced salary and play for just a year.
+                p.contract.amount = maxSalarySpace;
+                p.contract.exp = g.season + 1;
+            }
+            return p;
+            // return dao.players.put({ot: tx, value: p}).then(function(p) {
+            //     return p;
+            // });
+        })
+
+        // Decide on current offers
+        // If negative check if salary demand is > maxSalarySpace
+        // Reduce salary demand if true.
+        //
+        // If positive, set team, sign contract and reduce salarySpace and
+        // roster spot of team.
+        // save p and t;
+        // announce signing;
+    }
+
+    function tickFreeAgencyDay(tx) {
+        return Promise.join(
+            dao.teams.getAll({ot: tx}),
+            dao.players.getAll({ot: tx, index: "tid", key: g.PLAYER.FREE_AGENT}),
+            function(teams, players) {
+                var maxSalarySpace, offers, t, p, i;
+                offers = [];
+                teams.sort(function(a, b) {
+                    return b.fa.salarySpace - a.fa.salarySpace;});
+                maxSalarySpace = teams[0].fa.salarySpace;
+                players.sort(function(a, b) {
+                    return b.contract.amount - a.contract.amount;
+                });
+
+                for (i = 0; i < teams.length; i++) {
+                    if (teams[i].fa.rosterSpace > 0 ) {
+                        offers.push(makeOffer(teams[i], players));
+                    }
+                }
+
+                return Promise.all(offers)
+                    .then(function(offers) {
+                        var decisions;
+                        console.log(offers);
+                        decisions = [];
+                        for (i = 0; i < players.length; i++) {
+                            decisions.push(decideContract(tx, players[i], maxSalarySpace));
+                        }
+                        return Promise.each(decisions, function(d) {
+                            // console.log(d);
+                        });
+                    });
+            }
+        );
+    }
+
+    /**
+     * Ready all teams for free agency.
      */
     function readyTeamsFA(tx) {
         var i, promises, readyTeam, sumContracts, teamComposite;
         tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
         promises = [];
-
-        for (i = 0; i < g.numTeams; i++) {
-            promises.push(game.loadTeam(i, tx, true));
-        }
 
         sumContracts = function(players) {
             return players.reduce(function(a, b) {
@@ -95,13 +195,16 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             return team;
         };
 
+        for (i = 0; i < g.numTeams; i++) {
+            promises.push(game.loadTeam(i, tx, true));
+        }
+
         return Promise.all(promises)
             .then(function(teams) {
                 _.each(teams, function(t) {
                     var team = readyTeam(t);
-                    console.log(team);
                     dao.teams.put({ot: tx, value: team}).then(function(t) {
-                        console.log(t);
+                        return;
                     });
                 })
             })
@@ -111,7 +214,39 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
      * Save composite rating.
      */
     function readyPlayersFA(tx) {
+        var readyPlayer, playerComposite;
+        tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
 
+        playerComposite = function(ratings) {
+            var cr, k, rating;
+            cr = {};
+            rating = _.find(ratings, function(x) { return x.season === g.season });
+            for (k in g.compositeWeights) {
+                if (g.compositeWeights.hasOwnProperty(k)) {
+                    cr[k] = game.makeComposite(rating, g.compositeWeights[k].ratings, g.compositeWeights[k].weights);
+                }
+            }
+            return cr;
+        }
+
+        readyPlayer = function(_void, baseMoods) {
+            return dao.players.iterate({
+                ot: tx,
+                index: "tid",
+                key: IDBKeyRange.bound(g.PLAYER.UNDRAFTED, g.PLAYER.FREE_AGENT),
+                callback: function (p) {
+                    p.offers = {}
+                    p.compositeRating = playerComposite(p.ratings)
+                    return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
+                }
+            });
+        };
+
+        return Promise.join(
+            require('core/contractNegotiation').cancelAll(),
+            player.genBaseMoods(tx),
+            readyPlayer
+        );
     }
 
     /**
@@ -405,6 +540,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         refuseToNegotiate: refuseToNegotiate,
         play: play,
         readyTeamsFA: readyTeamsFA,
-        readyPlayersFA: readyPlayersFA
+        readyPlayersFA: readyPlayersFA,
+        tickFreeAgencyDay: tickFreeAgencyDay
     };
 });

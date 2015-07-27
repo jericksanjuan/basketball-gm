@@ -17,10 +17,19 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
 
         describe('readyTeamsFA', function() {
             it('should ready teams for FA', function() {
-                return fa.readyTeamsFA()
-                    .then(function(teams) {
-                        console.log(teams);
-                    });
+                return fa.readyTeamsFA();
+            });
+        });
+
+        describe('readyPlayersFA', function() {
+            it('should ready players for FA', function() {
+                return fa.readyPlayersFA();
+            });
+        });
+
+        describe('tickFreeAgencyDay', function() {
+            it('should do task for a FA day', function() {
+                return fa.tickFreeAgencyDay();
             });
         });
 

@@ -226,7 +226,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
     function cancel(pid) {
         var tx;
 
-        tx = dao.tx(["gameAttributes", "messages", "negotiations"], "readwrite");
+        tx = dao.tx(["gameAttributes", "messages", "negotiations"], "readwrite", pid);
 
         // Delete negotiation
         dao.negotiations.delete({ot: tx, key: pid}).then(function () {
@@ -258,8 +258,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
      * @return {Promise}
      */
     function cancelAll(tx) {
+        var tx = dao.tx(["gameAttributes", "messages", "negotiations"], "readwrite")
         return dao.negotiations.clear({ot: tx}).then(function () {
-            require("core/league").updateLastDbChange();
             ui.updateStatus("Idle");
             return ui.updatePlayMenu(tx);
         });
