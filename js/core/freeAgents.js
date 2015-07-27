@@ -43,18 +43,19 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         for (i = 0; i < tcount.length; i++) {
             tcount[i] = tcount[i].slice(0, 2);
         }
-        tcount = _.flatten(tcount);
+        tcount = _.flatten( tcount);
         diff = _.difference(needs, tcount);
         return _.difference(needsCopy, diff).slice(0,5);
     }
 
     function makeOffer(t, players) {
-        var fp, needs, i, offers, pp, rosterSpace, salaryOffered, salarySpace, toRemove;
         return Promise.try(function() {
+            var fp, needs, i, offers, offered, pp, rosterSpace, salaryOffered,
+                salarySpace, toRemove;
             offers = [];
+            offered = [];
             fp = helpers.deepCopy(players);
 
-            console.log(t.region, t.fa.salarySpace);
             needs = teamNeeds(t.fa.compositeRating);
             needs = groupNeeds(needs);
             salarySpace = t.fa.salarySpace;
@@ -63,7 +64,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 // filter by criteria and salary
                 pp = fp.filter(function(p) {
                     return p.compositeRating[needs[i]] > t.fa.compositeRating[needs[i]] &&
-                        p.contract.amount <= salarySpace;
+                        p.contract.amount <= salarySpace &&
+                        offered.indexOf(p.pid) < 0;
                 });
                 // sort by rating and salary value.
                 pp = pp.sort(function(a, b) {
@@ -72,14 +74,16 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     return (r === 0) ? b.contract.amount/b.value - a.contract.amount/a.value : r;
                 });
                 if (pp.length > 0) {
+                    // TODO: offer amount and exp depending on own fuzz value of player.
                     offers.push({
                         tid: t.tid,
                         pid: pp[0].pid,
-                        amount: pp[0].contract.amount,
+                        amount: pp[0].contract.amount + Math.random(0, 10),
                         exp: pp[0].contract.exp
                     })
                     salarySpace -= pp[0].contract.amount;
                     rosterSpace -= 1;
+                    offered.push(pp[0].pid);
                     if (rosterSpace === 0) {
                         i = needs.length;
                     }
@@ -89,30 +93,77 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         });
     }
 
-    function decideContract(tx, p, maxSalarySpace) {
-        return Promise.try(function() {
+    function decideContract(tx, p, offers, maxSalarySpace) {
+        var acceptContract, goContract, teamUpdate;
+        offers = _.where(offers, {pid: p.pid});
+        if (offers.length === 0) {
+            return;
+        }
+
+        teamUpdate = function(tid, amount) {
+            return dao.teams.get({
+                ot: tx,
+                key: tid
+            })
+            .then(function(t) {
+                console.log(t.region, t.fa.salarySpace, amount, t.fa.salarySpace - amount, t.fa.rosterSpace);
+                t.fa.salarySpace = Math.max(0, t.fa.salarySpace - amount);
+                t.fa.salarySpace = Math.max(t.fa.salarySpace, g.minContract);
+                t.fa.rosterSpace -= 1
+                return dao.teams.put({ot: tx, value: t}).then(function() {
+                    return;
+                })
+            });
+        }
+
+        acceptContract = function(offer) {
+            p.tid = offer.tid;
+            p.amount = offer.amount;
+            p.exp = offer.exp;
+            if (g.phase <= g.PHASE.PLAYOFFS) {
+                p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
+            }
+            p = player.setContract(p, p.contract, true);
+            p.gamesUntilTradable = 15;
+
+            eventLog.add(null, {
+                type: "freeAgent",
+                text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
+                showNotification: p.tid === g.userTid,
+                pids: [p.pid],
+                tids: [p.tid]
+            });
+            return teamUpdate(offer.tid, offer.amount)
+                .then(function()  {
+                    return dao.players.put({ot: tx, value: p}).then(function() {
+                        return;
+                    });
+                });
+        }
+
+        goContract = Math.random() > 0.5 - (1 - g.daysLeft/30);
+        if (goContract) {
+            console.log(p.name, offers.length, offers[0].amount);
+            return acceptContract(offers[0]);
+        } else {
             if (p.contract.amount > maxSalarySpace) {
                 // accept reduced salary and play for just a year.
                 p.contract.amount = maxSalarySpace;
                 p.contract.exp = g.season + 1;
+                console.log('Reduced salary for ', p.name);
             }
-            return p;
-            // return dao.players.put({ot: tx, value: p}).then(function(p) {
-            //     return p;
-            // });
-        })
 
-        // Decide on current offers
-        // If negative check if salary demand is > maxSalarySpace
-        // Reduce salary demand if true.
-        //
-        // If positive, set team, sign contract and reduce salarySpace and
-        // roster spot of team.
-        // save p and t;
-        // announce signing;
+            return dao.players.put({ot: tx, value: p}).then(function(p) {
+                return p;
+            });
+        }
     }
 
     function tickFreeAgencyDay(tx) {
+        require("core/league").setGameAttributesComplete({daysLeft: g.daysLeft - 1, lastDbChange: Date.now()});
+        console.log(g.daysLeft, 'of Free Agency');
+        tx = dao.tx(["players", "releasedPlayers", "teams", "playerStats"], "readwrite", tx);
+
         return Promise.join(
             dao.teams.getAll({ot: tx}),
             dao.players.getAll({ot: tx, index: "tid", key: g.PLAYER.FREE_AGENT}),
@@ -126,6 +177,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     return b.contract.amount - a.contract.amount;
                 });
 
+                var rosterSpaceTotal = teams.reduce(function(a, b) {
+                    return a + b.fa.rosterSpace;
+                }, 0);
+                console.log('maxSalarySpace', maxSalarySpace,
+                    'roster space', rosterSpaceTotal,
+                    'free agent count', players.length);
                 for (i = 0; i < teams.length; i++) {
                     if (teams[i].fa.rosterSpace > 0 ) {
                         offers.push(makeOffer(teams[i], players));
@@ -135,13 +192,11 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 return Promise.all(offers)
                     .then(function(offers) {
                         var decisions;
-                        console.log(offers);
-                        decisions = [];
-                        for (i = 0; i < players.length; i++) {
-                            decisions.push(decideContract(tx, players[i], maxSalarySpace));
-                        }
-                        return Promise.each(decisions, function(d) {
-                            // console.log(d);
+                        offers = _.flatten(offers);
+                        offers = _.sortBy(offers, 'pid');
+                        console.log('offers count', offers.length);
+                        return Promise.each(players, function(p) {
+                            return decideContract(tx, p, offers, maxSalarySpace);
                         });
                     });
             }
@@ -235,7 +290,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 index: "tid",
                 key: IDBKeyRange.bound(g.PLAYER.UNDRAFTED, g.PLAYER.FREE_AGENT),
                 callback: function (p) {
-                    p.offers = {}
+                    p.offers = []
                     p.compositeRating = playerComposite(p.ratings)
                     return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
                 }
