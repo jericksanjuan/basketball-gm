@@ -2,8 +2,117 @@
  * @name core.freeAgents
  * @namespace Functions related to free agents that didn't make sense to put anywhere else.
  */
-define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, Promise, _, eventLog, helpers, lock, random) {
+define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, game, Promise, _, eventLog, helpers, lock, random) {
     "use strict";
+
+    function makeOffer(tx, t, p) {
+        tx = dao.tx(["players", "playerStats", "releasedPlayers", "teams"], "readwrite", tx);
+        /**
+         * Get all teams and free agents
+         * team looks for n players where n is number of slot + 1 (?)
+         * team makes contract offer to player according to their perceived value of
+         *   the player (fuzz by scouting rank). Attach to player and team dict.
+         *
+         *
+         */
+    }
+
+    function decideContract(p) {
+        /**
+         * Player decides today to sign  with team with highest offer grade.
+         */
+
+    }
+
+
+    function tickFreeAgencyDay(tx) {
+        // return Promise.getAll([
+        //     dao.teams.getAll({ot: tx}),
+        //     dao.players.getAll({ot: tx, index: "tid", key: g.PLAYER.FREE_AGENT})
+        // ])
+        // .spread(function(tms, plr) {
+        //     var i, offers;
+        //     tms = tms.filter()
+        // })
+    }
+
+
+    /**
+     * Iterate on all teams to save info
+     *
+     * salary situation
+     * roster space
+     * team synergy
+     * team composite rating (first 5 to 8th)
+     * team stats (identify need)
+     * fuzz value!
+     */
+    function readyTeamsFA(tx) {
+        var i, promises, readyTeam, sumContracts, teamComposite;
+        tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
+        promises = [];
+
+        for (i = 0; i < g.numTeams; i++) {
+            promises.push(game.loadTeam(i, tx, true));
+        }
+
+        sumContracts = function(players) {
+            return players.reduce(function(a, b) {
+                return a + b.contract.amount;
+            }, 0);
+        };
+
+        teamComposite = function(players, numOfPlayers) {
+            var i, k, tc;
+            numOfPlayers = (numOfPlayers > players.length) ? players.length - 1 : numOfPlayers;
+            tc = {}
+            for (k in g.compositeWeights) {
+                if (g.compositeWeights.hasOwnProperty(k)) {
+                    for (i = 0; i < numOfPlayers; i++) {
+                        if (tc.hasOwnProperty(k)) {
+                            tc[k] += players[i].compositeRating[k];
+                        } else {
+                            tc[k] = players[i].compositeRating[k];
+                        }
+                    }
+                    tc[k] /= numOfPlayers;
+                }
+            }
+            return tc;
+        }
+
+        readyTeam = function(t) {
+            var team = t.team;
+            team.fa = {};
+
+            team.fa.compositeRating = teamComposite(t.player, 7);
+            // team.fa.synergy
+            team.fa.rosterSpace = Math.max(0, 15 - t.player.length);
+            team.fa.salarySpace = Math.max(0, g.salaryCap - sumContracts(t.player));
+            team.fa.salarySpace = Math.max(team.fa.salarySpace, g.minContract);
+
+            team.fa.fuzzValue = player.genFuzz(t.scoutingRank);
+            return team;
+        };
+
+        return Promise.all(promises)
+            .then(function(teams) {
+                _.each(teams, function(t) {
+                    var team = readyTeam(t);
+                    console.log(team);
+                    dao.teams.put({ot: tx, value: team}).then(function(t) {
+                        console.log(t);
+                    });
+                })
+            })
+    }
+
+    /**
+     * Save composite rating.
+     */
+    function readyPlayersFA(tx) {
+
+    }
 
     /**
      * AI teams sign free agents.
@@ -294,6 +403,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         decreaseDemands: decreaseDemands,
         amountWithMood: amountWithMood,
         refuseToNegotiate: refuseToNegotiate,
-        play: play
+        play: play,
+        readyTeamsFA: readyTeamsFA,
+        readyPlayersFA: readyPlayersFA
     };
 });

@@ -492,103 +492,114 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
      * @param {Promise} Resolves to an array of team objects, ordered by tid.
      */
     function loadTeams(ot) {
-        var loadTeam, promises, tid;
-
-        loadTeam = function (tid) {
-            return Promise.all([
-                dao.players.getAll({ot: ot, index: "tid", key: tid}),
-                dao.teams.get({ot: ot, key: tid})
-            ]).spread(function (players, team) {
-                var i, j, k, numPlayers, p, pos, rating, t, teamSeason;
-
-                players.sort(function (a, b) { return a.rosterOrder - b.rosterOrder; });
-
-                t = {id: tid, defense: 0, pace: 0, won: 0, lost: 0, cid: 0, did: 0, stat: {}, player: [], synergy: {off: 0, def: 0, reb: 0}};
-
-                for (j = 0; j < team.seasons.length; j++) {
-                    if (team.seasons[j].season === g.season) {
-                        teamSeason = team.seasons[j];
-                        break;
-                    }
-                }
-                t.won = teamSeason.won;
-                t.lost = teamSeason.lost;
-                t.cid = team.cid;
-                t.did = team.did;
-                t.healthRank = teamSeason.expenses.health.rank;
-
-                for (i = 0; i < players.length; i++) {
-                    pos = players[i].ratings[players[i].ratings.length - 1].pos;
-                    p = {id: players[i].pid, name: players[i].name, pos: pos, valueNoPot: players[i].valueNoPot, stat: {}, compositeRating: {}, skills: [], injury: players[i].injury, injured: players[i].injury.type !== "Healthy", ptModifier: players[i].ptModifier};
-
-                    // Reset ptModifier for AI teams. This should not be necessary since it should always be 1, but let's be safe.
-                    if (t.id !== g.userTid) {
-                        p.ptModifier = 1;
-                    }
-
-                    for (j = 0; j < players[i].ratings.length; j++) {
-                        if (players[i].ratings[j].season === g.season) {
-                            rating = players[i].ratings[j];
-                            break;
-                        }
-                    }
-
-                    if (rating === undefined) {
-                        throw new Error("Player with no ratings for this season: " + players[i].name + "(ID: " + players[i].pid + ")");
-                    }
-
-                    p.skills = rating.skills;
-
-                    p.ovr = rating.ovr;
-
-                    // These use the same formulas as the skill definitions in player.skills!
-                    for (k in g.compositeWeights) {
-                        if (g.compositeWeights.hasOwnProperty(k)) {
-                            p.compositeRating[k] = makeComposite(rating, g.compositeWeights[k].ratings, g.compositeWeights[k].weights);
-                        }
-                    }
-                    p.compositeRating.usage = Math.pow(p.compositeRating.usage, 1.9);
-
-                    p.stat = {gs: 0, min: 0, fg: 0, fga: 0, fgAtRim: 0, fgaAtRim: 0, fgLowPost: 0, fgaLowPost: 0, fgMidRange: 0, fgaMidRange: 0, tp: 0, tpa: 0, ft: 0, fta: 0, pm: 0, orb: 0, drb: 0, ast: 0, tov: 0, stl: 0, blk: 0, ba: 0, pf: 0, pts: 0, courtTime: 0, benchTime: 0, energy: 1};
-
-                    t.player.push(p);
-                }
-
-                // Number of players to factor into pace and defense rating calculation
-                numPlayers = t.player.length;
-                if (numPlayers > 7) {
-                    numPlayers = 7;
-                }
-
-                // Would be better if these were scaled by average min played and endurancence
-                t.pace = 0;
-                for (i = 0; i < numPlayers; i++) {
-                    t.pace += t.player[i].compositeRating.pace;
-                }
-                t.pace /= numPlayers;
-                t.pace = t.pace * 15 + 100;  // Scale between 100 and 115
-
-                // Initialize team composite rating object
-                t.compositeRating = {};
-                for (rating in p.compositeRating) {
-                    if (p.compositeRating.hasOwnProperty(rating)) {
-                        t.compositeRating[rating] = 0;
-                    }
-                }
-
-                t.stat = {min: 0, fg: 0, fga: 0, fgAtRim: 0, fgaAtRim: 0, fgLowPost: 0, fgaLowPost: 0, fgMidRange: 0, fgaMidRange: 0, tp: 0, tpa: 0, ft: 0, fta: 0, orb: 0, drb: 0, ast: 0, tov: 0, stl: 0, blk: 0, ba: 0, pf: 0, pts: 0, ptsQtrs: [0]};
-
-                return t;
-            });
-        };
-
+        var promises, tid;
         promises = [];
 
         for (tid = 0; tid < g.numTeams; tid++) {
-            promises.push(loadTeam(tid));
+            promises.push(loadTeam(tid, ot));
         }
 
         return Promise.all(promises);
+    }
+
+    function loadTeam(tid, ot, forFA) {
+        forFA = forFA || false;
+        return Promise.all([
+            dao.players.getAll({ot: ot, index: "tid", key: tid}),
+            dao.teams.get({ot: ot, key: tid})
+        ]).spread(function (players, team) {
+            var i, j, k, numPlayers, p, pos, rating, t, teamSeason;
+
+            players.sort(function (a, b) { return a.rosterOrder - b.rosterOrder; });
+
+            t = {id: tid, defense: 0, pace: 0, won: 0, lost: 0, cid: 0, did: 0, stat: {}, player: [], synergy: {off: 0, def: 0, reb: 0}};
+
+            for (j = 0; j < team.seasons.length; j++) {
+                if (team.seasons[j].season === g.season) {
+                    teamSeason = team.seasons[j];
+                    break;
+                }
+            }
+            t.won = teamSeason.won;
+            t.lost = teamSeason.lost;
+            t.cid = team.cid;
+            t.did = team.did;
+            t.healthRank = teamSeason.expenses.health.rank;
+
+            for (i = 0; i < players.length; i++) {
+                pos = players[i].ratings[players[i].ratings.length - 1].pos;
+                p = {id: players[i].pid, name: players[i].name, pos: pos, valueNoPot: players[i].valueNoPot, stat: {}, compositeRating: {}, skills: [], injury: players[i].injury, injured: players[i].injury.type !== "Healthy", ptModifier: players[i].ptModifier};
+
+                // Reset ptModifier for AI teams. This should not be necessary since it should always be 1, but let's be safe.
+                if (t.id !== g.userTid) {
+                    p.ptModifier = 1;
+                }
+
+                for (j = 0; j < players[i].ratings.length; j++) {
+                    if (players[i].ratings[j].season === g.season) {
+                        rating = players[i].ratings[j];
+                        break;
+                    }
+                }
+
+                if (rating === undefined) {
+                    throw new Error("Player with no ratings for this season: " + players[i].name + "(ID: " + players[i].pid + ")");
+                }
+
+                p.skills = rating.skills;
+
+                p.ovr = rating.ovr;
+
+                // These use the same formulas as the skill definitions in player.skills!
+                for (k in g.compositeWeights) {
+                    if (g.compositeWeights.hasOwnProperty(k)) {
+                        p.compositeRating[k] = makeComposite(rating, g.compositeWeights[k].ratings, g.compositeWeights[k].weights);
+                    }
+                }
+                p.compositeRating.usage = Math.pow(p.compositeRating.usage, 1.9);
+
+                p.stat = {gs: 0, min: 0, fg: 0, fga: 0, fgAtRim: 0, fgaAtRim: 0, fgLowPost: 0, fgaLowPost: 0, fgMidRange: 0, fgaMidRange: 0, tp: 0, tpa: 0, ft: 0, fta: 0, pm: 0, orb: 0, drb: 0, ast: 0, tov: 0, stl: 0, blk: 0, ba: 0, pf: 0, pts: 0, courtTime: 0, benchTime: 0, energy: 1};
+
+                if (forFA) {
+                    p.contract = players[i].contract;
+                }
+
+                t.player.push(p);
+            }
+
+            // Number of players to factor into pace and defense rating calculation
+            numPlayers = t.player.length;
+            if (numPlayers > 7) {
+                numPlayers = 7;
+            }
+
+            // Would be better if these were scaled by average min played and endurancence
+            t.pace = 0;
+            for (i = 0; i < numPlayers; i++) {
+                t.pace += t.player[i].compositeRating.pace;
+            }
+            t.pace /= numPlayers;
+            t.pace = t.pace * 15 + 100;  // Scale between 100 and 115
+
+            // Initialize team composite rating object
+            t.compositeRating = {};
+            for (rating in p.compositeRating) {
+                if (p.compositeRating.hasOwnProperty(rating)) {
+                    t.compositeRating[rating] = 0;
+                }
+            }
+
+            t.stat = {min: 0, fg: 0, fga: 0, fgAtRim: 0, fgaAtRim: 0, fgLowPost: 0, fgaLowPost: 0, fgMidRange: 0, fgaMidRange: 0, tp: 0, tpa: 0, ft: 0, fta: 0, orb: 0, drb: 0, ast: 0, tov: 0, stl: 0, blk: 0, ba: 0, pf: 0, pts: 0, ptsQtrs: [0]};
+
+            if (forFA) {
+                t.team = team;
+                t.scoutingRank = teamSeason.expenses.scouting.rank;
+                t.coachingRank = teamSeason.expenses.coaching.rank;
+                t.facilitiesRank = teamSeason.expenses.facilities.rank;
+            }
+
+            return t;
+        });
     }
 
     /**
@@ -875,6 +886,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
     }
 
     return {
-        play: play
+        play: play,
+        loadTeam: loadTeam
     };
 });

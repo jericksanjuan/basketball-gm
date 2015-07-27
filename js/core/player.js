@@ -2108,6 +2108,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         moodColorText: moodColorText,
         augmentPartialPlayer: augmentPartialPlayer,
         checkStatisticalFeat: checkStatisticalFeat,
-        killOne: killOne
+        killOne: killOne,
+        genFuzz: genFuzz
     };
 });
