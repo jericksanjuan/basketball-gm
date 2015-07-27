@@ -67,19 +67,21 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                         p.contract.amount <= salarySpace &&
                         offered.indexOf(p.pid) < 0;
                 });
-                // sort by rating and salary value.
-                pp = pp.sort(function(a, b) {
-                    var r = 0;
-                    r = b.compositeRating[needs[i]] -  a.compositeRating[needs[i]];
-                    return (r === 0) ? b.contract.amount/b.value - a.contract.amount/a.value : r;
-                });
+
                 if (pp.length > 0) {
+                    // sort by rating and salary value.
+                    pp = pp.sort(function(a, b) {
+                        var r = 0;
+                        r = b.compositeRating[needs[i]] -  a.compositeRating[needs[i]];
+                        return (r === 0) ? b.contract.amount/b.value - a.contract.amount/a.value : r;
+                    });
                     // TODO: offer amount and exp depending on own fuzz value of player.
                     offers.push({
                         tid: t.tid,
                         pid: pp[0].pid,
                         amount: pp[0].contract.amount + Math.random(0, 10),
-                        exp: pp[0].contract.exp
+                        exp: pp[0].contract.exp,
+                        skill: needs[i]
                     })
                     salarySpace -= pp[0].contract.amount;
                     rosterSpace -= 1;
@@ -100,7 +102,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             return;
         }
 
-        teamUpdate = function(tid, amount) {
+        teamUpdate = function(tid, amount, skill, skillValue) {
             return dao.teams.get({
                 ot: tx,
                 key: tid
@@ -109,7 +111,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 console.log(t.region, t.fa.salarySpace, amount, t.fa.salarySpace - amount, t.fa.rosterSpace);
                 t.fa.salarySpace = Math.max(0, t.fa.salarySpace - amount);
                 t.fa.salarySpace = Math.max(t.fa.salarySpace, g.minContract);
-                t.fa.rosterSpace -= 1
+                t.fa.rosterSpace -= 1;
+                t.fa.compositeRating[skill] += skillValue;
+                t.fa.compositeRating[skill] /= 2;
                 return dao.teams.put({ot: tx, value: t}).then(function() {
                     return;
                 })
@@ -133,7 +137,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 pids: [p.pid],
                 tids: [p.tid]
             });
-            return teamUpdate(offer.tid, offer.amount)
+            return teamUpdate(offer.tid, offer.amount, offer.skill, p.compositeRating[offer.skill])
                 .then(function()  {
                     return dao.players.put({ot: tx, value: p}).then(function() {
                         return;
