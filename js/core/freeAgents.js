@@ -45,25 +45,30 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         }
         tcount = _.flatten( tcount);
         diff = _.difference(needs, tcount);
-        return _.difference(needsCopy, diff).slice(0,5);
+        return _.difference(needsCopy, diff).slice(0, 5);
     }
 
     function makeOffer(t, players) {
         return Promise.try(function() {
             var fp, needs, i, offers, offered, pp, rosterSpace, salaryOffered,
-                salarySpace, toRemove;
+                salarySpace, toRemove, zVal;
             offers = [];
             offered = [];
             fp = helpers.deepCopy(players);
 
             needs = teamNeeds(t.fa.compositeRating);
-            needs = groupNeeds(needs);
+            if (g.daysLeft < 10 && t.rosterSpace > 3) {
+                needs = needs;
+            } else {
+                needs = groupNeeds(needs, 5);
+            }
+            zVal = (g.daysLeft < 2 && t.rosterSpace > 5) ?  0.25 : 1;
             salarySpace = t.fa.salarySpace;
             rosterSpace = t.fa.rosterSpace;
             for (i = 0; i < needs.length; i++) {
                 // filter by criteria and salary
                 pp = fp.filter(function(p) {
-                    return p.compositeRating[needs[i]] > t.fa.compositeRating[needs[i]] &&
+                    return p.compositeRating[needs[i]] > t.fa.compositeRating[needs[i]] * zVal &&
                         p.contract.amount <= salarySpace &&
                         offered.indexOf(p.pid) < 0;
                 });
@@ -187,6 +192,11 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 console.log('maxSalarySpace', maxSalarySpace,
                     'roster space', rosterSpaceTotal,
                     'free agent count', players.length);
+                if (g.daysLeft === 0) {
+                    console.log(JSON.stringify(
+                        teams.map(function(t) { return [t.region, t.fa.rosterSpace];})
+                        ));
+                }
                 for (i = 0; i < teams.length; i++) {
                     if (teams[i].fa.rosterSpace > 0 ) {
                         offers.push(makeOffer(teams[i], players));
