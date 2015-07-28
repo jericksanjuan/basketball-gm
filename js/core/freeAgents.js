@@ -346,7 +346,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
      * Try to resign players for the cpu and user teams (if autoplay)
      */
     function cpuResignPlayers(tx, baseMoods) {
-        var gradeComposite, gradePlayer, resignPlayer, resignPlayers, tx, updatePlayer;
+        var eventReleased, eventResigned, gradeComposite, gradePlayer,
+            resignPlayer, resignPlayers, tx, updatePlayer;
         tx = dao.tx(["gameAttributes", "messages", "negotiations",  "players", "releasedPlayers", "teams"], "readwrite", tx);
 
         updatePlayer = function(p) {
@@ -381,6 +382,26 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             return grade;
         };
 
+        eventResigned =  function(p) {
+            eventLog.add(null, {
+                type: "reSigned",
+                text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> re-signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
+                showNotification: false,
+                pids: [p.pid],
+                tids: [p.tid]
+            });
+        };
+
+        eventReleased = function(p) {
+            eventLog.add(null, {
+                type: "released",
+                text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
+                showNotification: false,
+                pids: [p.pid],
+                tids: [p.tid]
+            });
+        };
+
         resignPlayers = function(players) {
             var i, tp, teamComposite, tExp, toUpdate;
             toUpdate = [];
@@ -398,22 +419,10 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                         p = player.setContract(p, contract, true);
                         p.gamesUntilTradable;
 
-                        eventLog.add(null, {
-                            type: "reSigned",
-                            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> re-signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
-                            showNotification: false,
-                            pids: [p.pid],
-                            tids: [p.tid]
-                        });
+                        eventResigned(p);
                     } else {
                         player.addToFreeAgents(tx, p, g.phase, baseMoods, false);
-                        eventLog.add(null, {
-                            type: "released",
-                            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
-                            showNotification: false,
-                            pids: [p.pid],
-                            tids: [p.tid]
-                        });
+                        eventReleased(p);
                     }
                 });
                 toUpdate = toUpdate.concat(tp);
