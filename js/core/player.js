@@ -1638,6 +1638,19 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
             return current;
         }
 
+        if (options.withContract) {
+            if (ps.length > 0) {
+                if (ps.length === 1) {
+                    return ps[0].ewa * 2000 - p.contract.amount;
+
+                } else {
+                    ps1 = ps[0];
+                    ps2 = ps[1];
+                    return ((2 * ps1 + ps2) / 3) * 2000 - p.contract.amount
+                }
+            }
+        }
+
         // 2. Potential
         potential = pr.pot;
 

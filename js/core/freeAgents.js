@@ -78,7 +78,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     // sort by rating and salary value.
                     pp = pp.sort(function(a, b) {
                         var r = 0;
-                        r = b.contract.amount/b.value - a.contract.amount/a.value;
+                        r = b.valueWithContract - a.valueWithContract;
                         return (r === 0) ? b.compositeRating[needs[i]] -  a.compositeRating[needs[i]] : r;
                     });
                     // TODO: offer amount and exp depending on own fuzz value of player.

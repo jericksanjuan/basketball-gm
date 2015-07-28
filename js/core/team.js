@@ -829,7 +829,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                     key: pidsAdd[i]
                 }).then(function (p) {
                     add.push({
-                        value: p.valueWithContract,
+                        value: p.value,
                         skills: _.last(p.ratings).skills,
                         contract: p.contract,
                         worth: player.genContract(p, false, false, true),
