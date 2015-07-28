@@ -90,7 +90,10 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                         skill: needs[i]
                     })
                     salarySpace = Math.max(0, salarySpace -pp[0].contract.amount);
-                    salarySpace = Math.max(g.minContract, salarySpace);
+                    // Only offer min contracts when salarySpace is low.
+                    if (zVal < 1 || t.fa.salarySpace <= g.minContract) {
+                        salarySpace = Math.max(g.minContract, salarySpace);
+                    }
                     rosterSpace -= 1;
                     offered.push(pp[0].pid);
                     if (rosterSpace === 0) {
@@ -150,7 +153,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 });
         }
 
-        goContract = Math.random() > 0.5 - (1 - g.daysLeft/30);
+        goContract = Math.random() > 0.6 - (1 - g.daysLeft/30);
         if (goContract) {
             console.log(p.name, offers.length, offers[0].amount);
             return acceptContract(offers[0]);
@@ -210,6 +213,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                         offers = _.flatten(offers);
                         offers = _.sortBy(offers, 'pid');
                         console.log('offers count', offers.length);
+                        if (offers.length === 0) {
+                            return;
+                        }
                         return Promise.each(players, function(p) {
                             return decideContract(tx, p, offers, maxSalarySpace);
                         });
