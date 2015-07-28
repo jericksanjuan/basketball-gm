@@ -38,7 +38,7 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
             //*/
         });
         before(function() {
-            tx = dao.tx(['gameAttributes'], 'readwrite', tx);
+            var tx = dao.tx(['gameAttributes'], 'readwrite', tx);
             return require("core/league").setGameAttributes(tx, {daysLeft: 30});
         });
         after(function () {

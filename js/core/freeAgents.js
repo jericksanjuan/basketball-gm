@@ -241,11 +241,17 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         );
     }
 
+    function sumContracts(players) {
+        return players.reduce(function(a, b) {
+            return a + b.contract.amount;
+        }, 0);
+    };
+
     /**
      * Ready all teams for free agency.
      */
     function readyTeamsFA(tx) {
-        var i, promises, readyTeam, sumContracts, teamComposite;
+        var i, promises, readyTeam, teamComposite;
         tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
         promises = [];
 
@@ -297,12 +303,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             })
     }
 
-    function sumContracts(players) {
-        return players.reduce(function(a, b) {
-            return a + b.contract.amount;
-        }, 0);
-    };
-
     function playerComposite(ratings) {
         var cr, k, rating;
         cr = {};
@@ -318,11 +318,11 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
     /**
      * Save composite rating.
      */
-    function readyPlayersFA(tx) {
+    function readyPlayersFA(tx, baseMoods) {
         var readyPlayer;
         tx = dao.tx(["gameAttributes", "messages", "negotiations",  "players", "releasedPlayers", "teams"], "readwrite", tx);
 
-        readyPlayer = function(_void, baseMoods) {
+        readyPlayer = function(_void) {
             return dao.players.iterate({
                 ot: tx,
                 index: "tid",
@@ -337,7 +337,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
 
         return Promise.join(
             require('core/contractNegotiation').cancelAll(tx),
-            player.genBaseMoods(tx),
             readyPlayer
         );
     }
