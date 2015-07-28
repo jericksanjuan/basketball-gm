@@ -1569,6 +1569,25 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
     }
 
     /**
+     * Gives player value for cpu with fuzz
+     * @param  {Object} p    player object
+     * @param  {Number} fuzz value for cpu fuzz
+     * @return {Number}      player value with cpu fuzz
+     */
+    function cpuValue(p, fuzz) {
+        var age, current, currentold, currentp, ovr, pot, potp, s;
+        current = p.valueNoPot * 0.9;
+        s = p.ratings.length - 1;
+        ovr = fuzzRating(p.ratings[s].ovr, fuzz);
+        pot = fuzzRating(p.ratings[s].pot, fuzz);
+
+        current = current + 0.1 * ovr;
+        age = (p.draft.year > g.season) ? p.draft.year - p.born.year : g.season - p.born.year;
+
+        return adjustValue(age, pot, current);
+    }
+
+    /**
      * Returns a numeric value for a given player, representing is general worth to a typical team
      * (i.e. ignoring how well he fits in with his teammates and the team's strategy/finances). It
      * is similar in scale to the overall and potential ratings of players (0-100), but it is based
@@ -1654,11 +1673,6 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         // 2. Potential
         potential = pr.pot;
 
-        // If performance is already exceeding predicted potential, just use that
-        if (current >= potential && age < 29) {
-            return current;
-        }
-
         // Otherwise, combine based on age
         if (p.draft.year > g.season) {
             // Draft prospect
@@ -1666,6 +1680,16 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         } else {
             age = g.season - p.born.year;
         }
+
+        return adjustValue(age, potential, current);
+    }
+
+    function adjustValue(age, potential, current) {
+        // If performance is already exceeding predicted potential, just use that
+        if (current >= potential && age < 29) {
+            return current;
+        }
+
         if (age <= 19) {
             return 0.8 * potential + 0.2 * current;
         }
@@ -2124,6 +2148,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         augmentPartialPlayer: augmentPartialPlayer,
         checkStatisticalFeat: checkStatisticalFeat,
         killOne: killOne,
-        genFuzz: genFuzz
+        genFuzz: genFuzz,
+        cpuValue: cpuValue
     };
 });

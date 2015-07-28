@@ -66,5 +66,16 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
             });
         });
 
+        describe('test', function() {
+            it.skip('should work', function() {
+                var p, player, v;
+                player = require('core/player');
+                p = {value: 80, valueNoPot: 70, ratings: [{ovr: 65, pot: 90}],
+                    draft: { year: 2014 }, born: {year: 1995 }};
+                v = player.cpuValue(p, 10.5);
+                console.log(v);
+            });
+        });
+
     });
 });
