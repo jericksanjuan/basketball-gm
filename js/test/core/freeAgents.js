@@ -6,6 +6,7 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
     "use strict";
 
     describe("core/freeAgents", function () {
+        var oBaseMoods;
         before(function () {
             return db.connectMeta().then(function () {
                 return league.create("Test", 20, undefined, 2015, false)
@@ -37,22 +38,36 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
             //*/
         });
         before(function() {
-            var tx = dao.tx(['gameAttributes'], 'readwrite', tx);
+            tx = dao.tx(['gameAttributes'], 'readwrite', tx);
             return require("core/league").setGameAttributes(tx, {daysLeft: 30});
         });
         after(function () {
             return league.remove(g.lid);
         });
 
+        describe('cpuResignPlayers', function() {
+            it('should resign players.', function() {
+                var tx = dao.tx(["gameAttributes", "messages", "negotiations",  "players", "releasedPlayers", "teams"], "readwrite");
+
+                var player = require('core/player');
+                return player.genBaseMoods(tx)
+                .then(function(baseMoods) {
+                    oBaseMoods = baseMoods;
+                    return fa.cpuResignPlayers(tx, baseMoods);
+                });
+            });
+        });
+
         describe('readyTeamsFA', function() {
-            it.skip('should ready teams for FA', function() {
+            it('should ready teams for FA', function() {
                 return fa.readyTeamsFA();
             });
         });
 
         describe('readyPlayersFA', function() {
-            it.skip('should ready players for FA', function() {
-                return fa.readyPlayersFA();
+            it('should ready players for FA', function() {
+                console.log('obaseMoods', oBaseMoods);
+                return fa.readyPlayersFA(null, oBaseMoods);
             });
         });
 
@@ -77,18 +92,6 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
                 v = player.cpuValue(p, 10.5);
                 v = player.cpuGenContract(p, 2.5);
                 console.log(v);
-            });
-        });
-
-        describe('cpuResignPlayers', function() {
-            it('should resign players.', function() {
-                var tx = dao.tx(["gameAttributes", "messages", "negotiations",  "players", "releasedPlayers", "teams"], "readwrite");
-
-                var player = require('core/player');
-                return player.genBaseMoods(tx)
-                .then(function(baseMoods) {
-                    return fa.cpuResignPlayers(tx, baseMoods);
-                });
             });
         });
     });

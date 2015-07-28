@@ -249,12 +249,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
         promises = [];
 
-        sumContracts = function(players) {
-            return players.reduce(function(a, b) {
-                return a + b.contract.amount;
-            }, 0);
-        };
-
         teamComposite = function(players, numOfPlayers) {
             var i, k, tc;
             numOfPlayers = (numOfPlayers > players.length) ? players.length - 1 : numOfPlayers;
@@ -303,6 +297,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             })
     }
 
+    function sumContracts(players) {
+        return players.reduce(function(a, b) {
+            return a + b.contract.amount;
+        }, 0);
+    };
+
     function playerComposite(ratings) {
         var cr, k, rating;
         cr = {};
@@ -347,12 +347,15 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
      */
     function cpuResignPlayers(tx, baseMoods) {
         var eventReleased, eventResigned, gradeComposite, gradePlayer,
-            resignPlayer, resignPlayers, tx, updatePlayer;
+            resignPlayer, resignPlayers, signPlayer, signOverLuxuryTax,
+            tx, updatePlayer;
         tx = dao.tx(["gameAttributes", "messages", "negotiations",  "players", "releasedPlayers", "teams"], "readwrite", tx);
 
         updatePlayer = function(p) {
             console.log((p.tid == -1) ? 'FA': p.tid, p.name, p.contract.amount, p.contract.exp);
-            console.log(p);
+            if (p.tid !== -1) {
+                eventResigned(p);
+            }
             dao.players.put({ot: tx, value: p}).thenReturn(null);
         };
 
@@ -374,11 +377,11 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 p.ratings[p.ratings.length - 1].ovr) / 10;
             roster = (14 - p.rosterOrder)/14.0;
             var grade = (age + 1.5 * composite + potential + 0.5 * roster + 2 * skill) / 6;
-            if(grade > 0.4) {
-                console.log('age:', age, 'composite:', composite,
-                    'potential:', potential, 'roster:', roster, 'skill:', skill,
-                    'grade', grade, 'name:', p.name, p.value, zAge);
-            }
+            // if(grade > 0.6) {
+            //     console.log('age:', age, 'composite:', composite,
+            //         'potential:', potential, 'roster:', roster, 'skill:', skill,
+            //         'grade', grade, 'name:', p.name, p.value, zAge);
+            // }
             return grade;
         };
 
@@ -392,45 +395,83 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             });
         };
 
-        eventReleased = function(p) {
+        eventReleased = function(p, tid) {
             eventLog.add(null, {
                 type: "released",
-                text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
+                text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tid], g.season]) + '">' + g.teamNamesCache[tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
                 showNotification: false,
                 pids: [p.pid],
-                tids: [p.tid]
+                tids: [tid]
             });
         };
 
-        resignPlayers = function(players) {
-            var i, tp, teamComposite, tExp, toUpdate;
+        signPlayer = function(p, tid) {
+            p.tid = tid;
+            p = player.setContract(p, p.contract, true);
+            p.gamesUntilTradable = 15;
+        }
+
+        signOverLuxuryTax = function(p, tid, grade, strategy, cash) {
+            if (strategy === 'rebuilding') {
+                if (grade > 1.0) {
+                    signPlayer(p, tid);
+                    console.log('rebuilding', 'resigned', p.name);
+                }
+            } else {
+                if (cash > 0) {
+                    signPlayer(p, tid);
+                }
+                if (grade > 9.0) {
+                    signPlayer(p, tid);
+                }
+                if (p.tid === tid) {
+                    console.log('contending', 'resigned', p.name);
+                }
+            }
+
+            if (p.tid === -1) {
+                // announce released of high grade FA.
+                console.log(p.name, 'released');
+                eventReleased(p, tid);
+            }
+        }
+
+        resignPlayers = function(teams, players) {
+            var i, cash, salarySpace, strategies,
+                tp, tpTmp, tpCopy, teamComposite, tExp, toUpdate;
             toUpdate = [];
+            strategies = _.pluck(teams, 'strategy');
+            cash = teams.map(function(t) { return _.last(t.seasons).cash; });
             players = _.groupBy(players, 'tid');
+
             for(i = 0; i < 30; i++) {
                 tp = players[i];
+                tpCopy = tp.slice();
                 tp = _.sortBy(tp, 'value').reverse();
                 tp = _.filter(tp, function(p) { return p.contract.exp === g.season; });
+                tpCopy = _.difference(tpCopy, tp);
+                salarySpace = g.salaryCap - sumContracts(tpCopy);
                 _.each(tp, function(p) {
                     var contract, grade;
                     grade = gradePlayer(p);
-                    if (grade > 0.6) {
-                        contract = player.genContract(p);
-                        contract.exp += 1;
-                        p = player.setContract(p, contract, true);
-                        p.gamesUntilTradable;
-
-                        eventResigned(p);
-                    } else {
-                        player.addToFreeAgents(tx, p, g.phase, baseMoods, false);
-                        eventReleased(p);
+                    player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods, false);
+                    if (p.freeAgentMood[i] > 1.25) console.log(p.name, 'refuses to sign.');
+                    if (grade > 0.6 && p.freeAgentMood[i] < 1.25) {
+                        if (salarySpace + p.contract.amount > g.luxuryPayroll) {
+                            signOverLuxuryTax(p, i, grade, strategies[i], cash[i]);
+                        } else {
+                            signPlayer(p, i);
+                        }
                     }
                 });
                 toUpdate = toUpdate.concat(tp);
             }
+
             return Promise.map(toUpdate, updatePlayer);
         };
 
         return Promise.join(
+            dao.teams.getAll({ot: tx}),
             dao.players.getAll({ot: tx, index: "tid", key: IDBKeyRange.lowerBound(0)}),
             resignPlayers
         )
