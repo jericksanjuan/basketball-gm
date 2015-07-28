@@ -72,7 +72,7 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
         });
 
         describe('tickFreeAgencyDay', function() {
-            it.skip('should do task for a FA day', function() {
+            it('should do task for a FA day', function() {
                 var Promise = require('lib/bluebird');
                 return Promise.each(_.range(30), function() {
                     return fa.tickFreeAgencyDay()

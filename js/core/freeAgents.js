@@ -111,9 +111,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
     function decideContract(tx, p, offers, maxSalarySpace) {
         var acceptContract, goContract, gradeOffer, teamUpdate;
         offers = _.where(offers, {pid: p.pid});
-        if (offers.length === 0) {
-            return;
-        }
 
         gradeOffer = function(offer) {
             var amount, exp, grade, mood, yr, yrOff;
@@ -168,11 +165,11 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         };
 
         goContract = Math.random() > 0.6 - (1 - g.daysLeft/30);
-        if (goContract) {
+        if (goContract && offers.length > 0) {
             // grade the offers
             offers.map(gradeOffer);
             offers.sort(function(a, b) { return b.grade - a.grade;});
-            console.log(p.name, offers.length, offers[0].amount);
+            console.log(p.name, offers.length, offers[0].amount, g.teamAbbrevsCache[offers[0].tid]);
             return acceptContract(offers[0]);
         } else {
             if (p.contract.amount > maxSalarySpace) {
@@ -430,7 +427,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
 
             if (p.tid === -1) {
                 // announce released of high grade FA.
-                console.log(p.name, 'released');
+                console.log(p.name, 'released', grade, strategy, cash);
                 eventReleased(p, tid);
             }
         }
