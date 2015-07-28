@@ -56,97 +56,13 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
 
         describe('tickFreeAgencyDay', function() {
             it('should do task for a FA day', function() {
-                return fa.tickFreeAgencyDay()
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
-                    .then(function() {
-                        return fa.tickFreeAgencyDay();
-                    })
+                var Promise = require('lib/bluebird');
+                return Promise.each(_.range(30), function() {
+                    return fa.tickFreeAgencyDay()
+                        .then(function() {
+                            return require("core/league").setGameAttributesComplete({daysLeft: g.daysLeft - 1, lastDbChange: Date.now()})
+                        });
+                });
             });
         });
 

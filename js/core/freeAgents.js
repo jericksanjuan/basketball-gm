@@ -62,7 +62,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             } else {
                 needs = groupNeeds(needs, 5);
             }
-            zVal = (g.daysLeft < 2 && t.rosterSpace > 5) ?  0.25 : 1;
+            zVal = (g.daysLeft < 8 && t.fa.rosterSpace > 3) ?  0.25 : 1;
             salarySpace = t.fa.salarySpace;
             rosterSpace = t.fa.rosterSpace;
             for (i = 0; i < needs.length; i++) {
@@ -169,7 +169,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
     }
 
     function tickFreeAgencyDay(tx) {
-        require("core/league").setGameAttributesComplete({daysLeft: g.daysLeft - 1, lastDbChange: Date.now()});
         console.log(g.daysLeft, 'of Free Agency');
         tx = dao.tx(["players", "releasedPlayers", "teams", "playerStats"], "readwrite", tx);
 
@@ -177,7 +176,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             dao.teams.getAll({ot: tx}),
             dao.players.getAll({ot: tx, index: "tid", key: g.PLAYER.FREE_AGENT}),
             function(teams, players) {
-                var maxSalarySpace, offers, t, p, i;
+                var i, maxSalarySpace, offers, p, rosterSpaceTotal, t;
                 offers = [];
                 teams.sort(function(a, b) {
                     return b.fa.salarySpace - a.fa.salarySpace;});
@@ -186,17 +185,20 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     return b.contract.amount - a.contract.amount;
                 });
 
-                var rosterSpaceTotal = teams.reduce(function(a, b) {
+                // debug
+                rosterSpaceTotal = teams.reduce(function(a, b) {
                     return a + b.fa.rosterSpace;
                 }, 0);
                 console.log('maxSalarySpace', maxSalarySpace,
                     'roster space', rosterSpaceTotal,
                     'free agent count', players.length);
-                if (g.daysLeft === 0) {
+                if (g.daysLeft === 1) {
                     console.log(JSON.stringify(
                         teams.map(function(t) { return [t.region, t.fa.rosterSpace];})
                         ));
                 }
+                // end debug
+
                 for (i = 0; i < teams.length; i++) {
                     if (teams[i].fa.rosterSpace > 0 ) {
                         offers.push(makeOffer(teams[i], players));
