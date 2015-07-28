@@ -640,33 +640,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         }
                     });
                 });
-            }).then(function () {
-                // Bump up future draft classes (nested so tid updates don't cause race conditions)
-                return dao.players.iterate({
-                    ot: tx,
-                    index: "tid",
-                    key: g.PLAYER.UNDRAFTED_2,
-                    callback: function (p) {
-                        p.tid = g.PLAYER.UNDRAFTED;
-                        p.ratings[0].fuzz /= 2;
-                        return p;
-                    }
-                }).then(function () {
-                    return dao.players.iterate({
-                        ot: tx,
-                        index: "tid",
-                        key: g.PLAYER.UNDRAFTED_3,
-                        callback: function (p) {
-                            p.tid = g.PLAYER.UNDRAFTED_2;
-                            p.ratings[0].fuzz /= 2;
-                            return p;
-                        }
-                    });
-                });
-            }).then(function () {
-                // Create new draft class for 3 years in the future
-                return draft.genPlayers(tx, g.PLAYER.UNDRAFTED_3);
-            }).then(function () {
+            }).then(draft.tickDraftClasses(tx)
+            ).then(function () {
                 return [helpers.leagueUrl(["free_agents"]), ["playerMovement"]];
             });
         });
