@@ -303,24 +303,24 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             })
     }
 
+    function playerComposite(ratings) {
+        var cr, k, rating;
+        cr = {};
+        rating = _.find(ratings, function(x) { return x.season === g.season });
+        for (k in g.compositeWeights) {
+            if (g.compositeWeights.hasOwnProperty(k)) {
+                cr[k] = game.makeComposite(rating, g.compositeWeights[k].ratings, g.compositeWeights[k].weights);
+            }
+        }
+        return cr;
+    }
+
     /**
      * Save composite rating.
      */
     function readyPlayersFA(tx) {
-        var readyPlayer, playerComposite;
+        var readyPlayer;
         tx = dao.tx(["gameAttributes", "messages", "negotiations",  "players", "releasedPlayers", "teams"], "readwrite", tx);
-
-        playerComposite = function(ratings) {
-            var cr, k, rating;
-            cr = {};
-            rating = _.find(ratings, function(x) { return x.season === g.season });
-            for (k in g.compositeWeights) {
-                if (g.compositeWeights.hasOwnProperty(k)) {
-                    cr[k] = game.makeComposite(rating, g.compositeWeights[k].ratings, g.compositeWeights[k].weights);
-                }
-            }
-            return cr;
-        }
 
         readyPlayer = function(_void, baseMoods) {
             return dao.players.iterate({
@@ -341,6 +341,92 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             readyPlayer
         );
     }
+
+    /**
+     * Try to resign players for the cpu and user teams (if autoplay)
+     */
+    function cpuResignPlayers(tx, baseMoods) {
+        var gradeComposite, gradePlayer, resignPlayer, resignPlayers, tx, updatePlayer;
+        tx = dao.tx(["gameAttributes", "messages", "negotiations",  "players", "releasedPlayers", "teams"], "readwrite", tx);
+
+        updatePlayer = function(p) {
+            console.log((p.tid == -1) ? 'FA': p.tid, p.name, p.contract.amount, p.contract.exp);
+            console.log(p);
+            dao.players.put({ot: tx, value: p}).thenReturn(null);
+        };
+
+        gradeComposite = function(composite) {
+            composite = _.omit(composite, ['pace', 'usage', 'turnovers', 'fouling']);
+            composite = _.filter(_.values(composite), function(v) {
+                return v > 0.6;
+            });
+            return composite.length / 10;
+        };
+
+        gradePlayer = function(p) {
+            var age, composite, potential, roster, skill, zAge;
+            zAge = g.season - p.born.year;
+            age = (4 - (zAge - 24))/4.0;
+            composite = gradeComposite(playerComposite(p.ratings));
+            skill = p.ratings[p.ratings.length - 1].skills.length / 2;
+            potential = (p.ratings[p.ratings.length - 1].pot -
+                p.ratings[p.ratings.length - 1].ovr) / 10;
+            roster = (14 - p.rosterOrder)/14.0;
+            var grade = (age + 1.5 * composite + potential + 0.5 * roster + 2 * skill) / 6;
+            if(grade > 0.4) {
+                console.log('age:', age, 'composite:', composite,
+                    'potential:', potential, 'roster:', roster, 'skill:', skill,
+                    'grade', grade, 'name:', p.name, p.value, zAge);
+            }
+            return grade;
+        };
+
+        resignPlayers = function(players) {
+            var i, tp, teamComposite, tExp, toUpdate;
+            toUpdate = [];
+            players = _.groupBy(players, 'tid');
+            for(i = 0; i < 30; i++) {
+                tp = players[i];
+                tp = _.sortBy(tp, 'value').reverse();
+                tp = _.filter(tp, function(p) { return p.contract.exp === g.season; });
+                _.each(tp, function(p) {
+                    var contract, grade;
+                    grade = gradePlayer(p);
+                    if (grade > 0.6) {
+                        contract = player.genContract(p);
+                        contract.exp += 1;
+                        p = player.setContract(p, contract, true);
+                        p.gamesUntilTradable;
+
+                        eventLog.add(null, {
+                            type: "reSigned",
+                            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> re-signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
+                            showNotification: false,
+                            pids: [p.pid],
+                            tids: [p.tid]
+                        });
+                    } else {
+                        player.addToFreeAgents(tx, p, g.phase, baseMoods, false);
+                        eventLog.add(null, {
+                            type: "released",
+                            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
+                            showNotification: false,
+                            pids: [p.pid],
+                            tids: [p.tid]
+                        });
+                    }
+                });
+                toUpdate = toUpdate.concat(tp);
+            }
+            return Promise.map(toUpdate, updatePlayer);
+        };
+
+        return Promise.join(
+            dao.players.getAll({ot: tx, index: "tid", key: IDBKeyRange.lowerBound(0)}),
+            resignPlayers
+        )
+    }
+
 
     /**
      * AI teams sign free agents.
@@ -634,6 +720,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         play: play,
         readyTeamsFA: readyTeamsFA,
         readyPlayersFA: readyPlayersFA,
-        tickFreeAgencyDay: tickFreeAgencyDay
+        tickFreeAgencyDay: tickFreeAgencyDay,
+        cpuResignPlayers, cpuResignPlayers
     };
 });

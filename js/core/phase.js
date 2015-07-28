@@ -586,7 +586,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             season: g.season
         }).then(function (teams) {
             strategies = _.pluck(teams, "strategy");
-
+            // COVERED
             // Delete all current negotiations to resign players
             return contractNegotiation.cancelAll(tx);
         }).then(function () {
@@ -599,6 +599,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                     callback: function (p) {
                         return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
                     }
+                // END COVERED
                 }).then(function () {
                     // AI teams re-sign players or they become free agents
                     // Run this after upding contracts for current free agents, or addToFreeAgents will be called twice for these guys
