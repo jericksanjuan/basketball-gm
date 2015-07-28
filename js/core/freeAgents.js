@@ -308,7 +308,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
      */
     function readyPlayersFA(tx) {
         var readyPlayer, playerComposite;
-        tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
+        tx = dao.tx(["gameAttributes", "messages", "negotiations",  "players", "releasedPlayers", "teams"], "readwrite", tx);
 
         playerComposite = function(ratings) {
             var cr, k, rating;
@@ -336,7 +336,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         };
 
         return Promise.join(
-            require('core/contractNegotiation').cancelAll(),
+            require('core/contractNegotiation').cancelAll(tx),
             player.genBaseMoods(tx),
             readyPlayer
         );
