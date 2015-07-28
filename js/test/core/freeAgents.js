@@ -73,6 +73,7 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
                 p = {value: 80, valueNoPot: 70, ratings: [{ovr: 65, pot: 90}],
                     draft: { year: 2014 }, born: {year: 1995 }};
                 v = player.cpuValue(p, 10.5);
+                v = player.cpuGenContract(p, 2.5);
                 console.log(v);
             });
         });

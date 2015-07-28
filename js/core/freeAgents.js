@@ -51,7 +51,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
     function makeOffer(t, players) {
         return Promise.try(function() {
             var fp, needs, i, offers, offered, pp, rosterSpace, salaryOffered,
-                salarySpace, toRemove, zVal;
+                salarySpace, toRemove, zVal, zContract;
             offers = [];
             offered = [];
             fp = helpers.deepCopy(players);
@@ -82,14 +82,17 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                         return (r === 0) ? b.compositeRating[needs[i]] -  a.compositeRating[needs[i]] : r;
                     });
                     // TODO: offer amount and exp depending on own fuzz value of player.
+                    zContract = player.cpuGenContract(pp[0], t.fa.fuzzValue);
+                    zContract.amount = Math.min(zContract.amount, salarySpace);
+                    // console.log('zContract', zContract.amount, pp[0].contract.amount);
                     offers.push({
                         tid: t.tid,
                         pid: pp[0].pid,
-                        amount: pp[0].contract.amount + Math.random(0, 10),
-                        exp: (zVal < 1) ? g.season + 1 : pp[0].contract.exp,
+                        amount: zContract.amount,
+                        exp: (zVal < 1) ? g.season + 1 : zContract.exp,
                         skill: needs[i]
                     })
-                    salarySpace = Math.max(0, salarySpace -pp[0].contract.amount);
+                    salarySpace = Math.max(0, salarySpace - zContract.amount);
                     // Only offer min contracts when salarySpace is low.
                     if (zVal < 1 || t.fa.salarySpace <= g.minContract) {
                         salarySpace = Math.max(g.minContract, salarySpace);
@@ -106,11 +109,22 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
     }
 
     function decideContract(tx, p, offers, maxSalarySpace) {
-        var acceptContract, goContract, teamUpdate;
+        var acceptContract, goContract, gradeOffer, teamUpdate;
         offers = _.where(offers, {pid: p.pid});
         if (offers.length === 0) {
             return;
         }
+
+        gradeOffer = function(offer) {
+            var amount, exp, grade, mood, yr, yrOff;
+            yrOff = offer.exp - g.season;
+            yr = p.contract.exp - g.season;
+            // (2*0.9 + 0.5*(3-abs(3-3))/3. + (1 - -0.25/2.5))/3.5
+            amount = offer.amount / p.contract.amount;
+            exp = (yr - Math.abs(yrOff - yr)) / yr;
+            mood = 1 - p.freeAgentMood[offer.tid] / 2.5;
+            offer.grade = (2 * amount + 0.5 * exp + mood) / 3.5;
+        };
 
         teamUpdate = function(tid, amount, skill, skillValue) {
             return dao.teams.get({
@@ -127,12 +141,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 return dao.teams.put({ot: tx, value: t})
                     .thenReturn(null);
             });
-        }
+        };
 
         acceptContract = function(offer) {
             p.tid = offer.tid;
-            p.amount = offer.amount;
-            p.exp = offer.exp;
+            p.contract.amount = offer.amount;
+            p.contract.exp = offer.exp;
             if (g.phase <= g.PHASE.PLAYOFFS) {
                 p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
             }
@@ -151,10 +165,13 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     return dao.players.put({ot: tx, value: p})
                         .thenReturn(null);
                 });
-        }
+        };
 
         goContract = Math.random() > 0.6 - (1 - g.daysLeft/30);
         if (goContract) {
+            // grade the offers
+            offers.map(gradeOffer);
+            offers.sort(function(a, b) { return b.grade - a.grade;});
             console.log(p.name, offers.length, offers[0].amount);
             return acceptContract(offers[0]);
         } else {

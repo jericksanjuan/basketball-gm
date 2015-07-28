@@ -1587,6 +1587,17 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         return adjustValue(age, pot, current);
     }
 
+    function cpuGenContract(p, fuzz) {
+        var contract, mp;
+        mp = {};
+        mp.value = cpuValue(p, fuzz);
+        mp.born = p.born;
+        mp.ratings = p.ratings;
+        contract = genContract(mp);
+        contract.amount = Math.ceil((contract.amount + 2 * p.contract.amount) / 3);
+        return contract;
+    }
+
     /**
      * Returns a numeric value for a given player, representing is general worth to a typical team
      * (i.e. ignoring how well he fits in with his teammates and the team's strategy/finances). It
@@ -2149,6 +2160,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         checkStatisticalFeat: checkStatisticalFeat,
         killOne: killOne,
         genFuzz: genFuzz,
-        cpuValue: cpuValue
+        cpuValue: cpuValue,
+        cpuGenContract: cpuGenContract
     };
 });
