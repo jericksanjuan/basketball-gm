@@ -2,7 +2,7 @@
  * @name core.freeAgents
  * @namespace Functions related to free agents that didn't make sense to put anywhere else.
  */
-define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, game, Promise, _, eventLog, helpers, lock, random) {
+define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, Promise, _, eventLog, helpers, lock, random) {
     "use strict";
 
     var CPU_RESIGN_CUTOFF = 0.6;
@@ -116,15 +116,14 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
 
                     if (toRelease) {
                         playerGrade = gradePlayer(pp[0]);
-                        console.log(pp[0], playerGrade);
-                        offerCond = playerGrade > (OFFER_GRADE_CUTOFF - 0.083);
+                        offerCond = playerGrade > (CPU_RESIGN_CUTOFF - 0.083);
                     } else {
                         offerCond = true;
                     }
 
                     if (offerCond) {
                         if (toRelease) {
-                            console.log(pp[0].name, 'passes grade, will sign.');
+                            console.log(pp[0].name, 'passes grade, will sign.', playerGrade);
                         }
                         zContract = player.cpuGenContract(pp[0], t.fuzzValue);
                         zContract.amount = Math.min(zContract.amount, salarySpace);
@@ -147,7 +146,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     } else {
                         // toRelease is true but BPA has failing grade
                         rosterSpace = 0;
-                        console.log(pp[0].name, 'fails test.');
                     }
                     if (rosterSpace === 0) {
                         i = needs.length;
@@ -335,7 +333,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
      * Ready all teams for free agency.
      */
     function readyTeamsFA(tx) {
-        var i, promises, readyTeam, teamComposite;
+        var game, i, promises, readyTeam, teamComposite;
+        game = require('core/game');
         tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
         promises = [];
 
@@ -392,7 +391,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
     }
 
     function playerComposite(ratings) {
-        var cr, k, rating;
+        var cr, game, k, rating;
+        game = require('core/game');
         cr = {};
         rating = _.find(ratings, function (x) {
             return x.season === g.season;
@@ -419,6 +419,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 key: IDBKeyRange.bound(g.PLAYER.UNDRAFTED, g.PLAYER.FREE_AGENT),
                 callback: function (p) {
                     p.compositeRating = playerComposite(p.ratings);
+                    p.faGrade = gradePlayer(p);
                     return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
                 }
             });
