@@ -27,8 +27,8 @@ require.config({
 
 require(["lib/chai", "lib/IndexedDB-getAll-shim", "util/templateHelpers"], function (chai) {
     "use strict";
-    var modules = ["test/core/contractNegotiation", "test/core/draft", "test/core/finances", "test/core/league", "test/core/player", "test/core/season", "test/core/team", "test/core/trade", "test/util/account", "test/util/helpers", "test/views/components", "test/views/gameLog"]
-    modules = ["test/core/freeAgents"]
+    var modules = ["test/core/contractNegotiation", "test/core/draft", "test/core/finances", "test/core/league", "test/core/player", "test/core/season", "test/core/team", "test/core/trade", "test/util/account", "test/util/helpers", "test/views/components", "test/views/gameLog"];
+    modules = ["test/core/freeAgents"];
 
     mocha.setup({
         ui: "bdd",

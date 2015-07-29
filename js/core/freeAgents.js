@@ -26,7 +26,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
      * @return {Array.string}       final fields to include, max length 5.
      */
     function groupNeeds(needs) {
-        var big, diff, defender, i, needsCopy, playmaker, shooter, tcount, ttype, wing, x;
+        var big, defender, diff, i, needsCopy, playmaker, shooter, tcount, ttype, wing, x;
         big = ['shootingLowPost', 'rebounding'];
         shooter = ['shootingMidRange', 'shootingThreePointer'];
         wing = ['athleticism', 'shootingAtRim'];
@@ -52,8 +52,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
 
     function makeOffer(t, players) {
         return Promise.try(function () {
-            var fp, needs, i, offers, offered, pp, rosterSpace, salaryOffered,
-                salarySpace, toRemove, zVal, zContract;
+            var fp, i, needs, offered, offers, pp, rosterSpace, salarySpace, zContract, zVal;
             offers = [];
             offered = [];
             fp = helpers.deepCopy(players);
@@ -117,7 +116,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         });
 
         gradeOffer = function (offer) {
-            var amount, exp, grade, mood, yr, yrOff;
+            var amount, exp, mood, yr, yrOff;
             yrOff = offer.exp - g.season;
             yr = p.contract.exp - g.season;
             // (2*0.9 + 0.5*(3-abs(3-3))/3. + (1 - -0.25/2.5))/3.5
@@ -183,20 +182,20 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             });
             console.log(p.name, offers.length, offers[0].amount, g.teamAbbrevsCache[offers[0].tid]);
             return acceptContract(offers[0]);
-        } else {
-            if (p.contract.amount > maxSalarySpace) {
-                // accept reduced salary and play for just a year.
-                p.contract.amount = maxSalarySpace;
-                p.contract.exp = g.season + 1;
-                console.log('Reduced salary for ', p.name, p.value, p.contract.amount, p.contract.exp);
-            }
-
-            return dao.players.put({
-                    ot: tx,
-                    value: p
-                })
-                .thenReturn(null);
         }
+
+        if (p.contract.amount > maxSalarySpace) {
+            // accept reduced salary and play for just a year.
+            p.contract.amount = maxSalarySpace;
+            p.contract.exp = g.season + 1;
+            console.log('Reduced salary for ', p.name, p.value, p.contract.amount, p.contract.exp);
+        }
+
+        return dao.players.put({
+                ot: tx,
+                value: p
+            })
+            .thenReturn(null);
     }
 
     function tickFreeAgencyDay(tx) {
@@ -213,7 +212,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 key: g.PLAYER.FREE_AGENT
             }),
             function (teams, players) {
-                var i, maxSalarySpace, offers, p, rosterSpaceTotal, t;
+                var i, maxSalarySpace, offers, rosterSpaceTotal;
                 offers = [];
                 teams.sort(function (a, b) {
                     return b.fa.salarySpace - a.fa.salarySpace;
@@ -247,7 +246,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
 
                 return Promise.all(offers)
                     .then(function (offers) {
-                        var decisions;
                         offers = _.flatten(offers);
                         offers = _.sortBy(offers, 'pid');
                         console.log('offers count', offers.length);
@@ -320,7 +318,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     dao.teams.put({
                         ot: tx,
                         value: team
-                    }).then(function (t) {
+                    }).then(function () {
                         return;
                     });
                 });
@@ -348,7 +346,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         var readyPlayer;
         tx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "releasedPlayers", "teams"], "readwrite", tx);
 
-        readyPlayer = function (_void) {
+        readyPlayer = function () {
             return dao.players.iterate({
                 ot: tx,
                 index: "tid",
@@ -371,13 +369,11 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
      * Try to resign players for the cpu and user teams (if autoplay)
      */
     function cpuResignPlayers(tx, baseMoods) {
-        var eventReleased, eventResigned, gradeComposite, gradePlayer,
-            resignPlayer, resignPlayers, signPlayer, signOverLuxuryTax,
-            updatePlayer;
+        var eventReleased, eventResigned, gradeComposite, gradePlayer, resignPlayers, signOverLuxuryTax, signPlayer, updatePlayer;
         tx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "releasedPlayers", "teams"], "readwrite", tx);
 
         updatePlayer = function (p) {
-            console.log((p.tid == -1) ? 'FA' : p.tid, p.name, p.contract.amount, p.contract.exp);
+            console.log((p.tid === -1) ? 'FA' : p.tid, p.name, p.contract.amount, p.contract.exp);
             if (p.tid !== -1) {
                 eventResigned(p);
             }
@@ -396,7 +392,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         };
 
         gradePlayer = function (p) {
-            var age, composite, potential, roster, skill, zAge;
+            var age, composite, grade, potential, roster, skill, zAge;
             zAge = g.season - p.born.year;
             age = (4 - (zAge - 24)) / 4.0;
             composite = gradeComposite(playerComposite(p.ratings));
@@ -404,7 +400,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             potential = (p.ratings[p.ratings.length - 1].pot -
                 p.ratings[p.ratings.length - 1].ovr) / 10;
             roster = (14 - p.rosterOrder) / 14.0;
-            var grade = (age + 1.5 * composite + potential + 0.5 * roster + 2 * skill) / 6;
+            grade = (age + 1.5 * composite + potential + 0.5 * roster + 2 * skill) / 6;
             // if(grade > 0.6) {
             //     console.log('age:', age, 'composite:', composite,
             //         'potential:', potential, 'roster:', roster, 'skill:', skill,
@@ -465,8 +461,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         };
 
         resignPlayers = function (teams, players) {
-            var i, cash, salarySpace, strategies,
-                tp, tpTmp, tpCopy, teamComposite, tExp, toUpdate;
+            var cash, i, salarySpace, strategies, toUpdate, tp, tpCopy;
+
             toUpdate = [];
             strategies = _.pluck(teams, 'strategy');
             cash = teams.map(function (t) {
@@ -484,10 +480,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 tpCopy = _.difference(tpCopy, tp);
                 salarySpace = g.salaryCap - sumContracts(tpCopy);
                 _.each(tp, function (p) {
-                    var contract, grade;
+                    var grade;
                     grade = gradePlayer(p);
                     player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods, false);
-                    if (p.freeAgentMood[i] > 1.25) console.log(p.name, 'refuses to sign.');
+                    if (p.freeAgentMood[i] > 1.25) {
+                        console.log(p.name, 'refuses to sign.');
+                    }
                     if (grade > 0.6 && p.freeAgentMood[i] < 1.25) {
                         if (salarySpace + p.contract.amount > g.luxuryPayroll) {
                             signOverLuxuryTax(p, i, grade, strategies[i], cash[i]);
