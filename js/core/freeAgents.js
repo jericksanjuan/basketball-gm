@@ -113,9 +113,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             fp = helpers.deepCopy(players);
 
             needs = teamNeeds(t.fa.compositeRating);
-            if (g.daysLeft <= 10 && t.fa.rosterSpace > 0 && !toRelease) {
+            if (g.daysLeft <= 15 && t.fa.rosterSpace > 0 && !toRelease) {
                 needs = needs;
-                zVal = (g.daysLeft - 1) / 10;
+                zVal = (g.daysLeft - 1) / 15;
             } else {
                 needs = groupNeeds(needs, 5);
                 zVal = 1;
@@ -128,6 +128,13 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 return p.contract.amount <= salarySpace;
             });
 
+            // Do not sign minimum contracts over the roster limit
+            if (toRelease) {
+                pp = pp.filter(function(p) {
+                    return p.contract.amount > g.minContract;
+                });
+            }
+
             if (pp.length > 0) {
                 // sort by grade and value;
                 pp.map(function(p) {
@@ -139,18 +146,22 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     return (r === 0) ? b.valueWithContract - a.valueWithContract : r;
                 });
 
-                baseScore =  0.6 + zVal * 0.2;
-                if (rosterSpace > 3 && pp[0].signingScore < baseScore) {
-                    baseScore = pp[rosterSpace - 4].signingScore;
+                baseScore =  0.45 + zVal * 0.35;
+                if (rosterSpace > 2 && pp[0].signingScore < baseScore) {
+                    baseScore = pp[rosterSpace - 3].signingScore;
                 }
 
                 for (i = 0; i < pp.length; i++)  {
-                    console.log(pp[i].value, pp[i].name, g.teamAbbrevsCache[t.tid], pp[i].signingScore, baseScore);
+                    // console.log(pp[i].value, pp[i].name, g.teamAbbrevsCache[t.tid], pp[i].signingScore, baseScore);
                     if (pp[i].signingScore >= baseScore || toRelease ) {
                         // toRelease = go over the roster limit to sign a free agent
                         // given that you have salary space available.
                         zContract = player.cpuGenContract(pp[i], t.fuzzValue);
+
                         if (zContract.amount <= salarySpace) {
+                            if (toRelease) {
+                                console.log(pp[i].name, 'signed over roster limit.');
+                            }
                             offers.push({
                                 tid: t.tid,
                                 pid: pp[i].pid,
@@ -161,7 +172,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                             });
                             salarySpace = Math.max(0, salarySpace - zContract.amount);
                             // Only offer min contracts when salarySpace is low.
-                            if (salarySpace <= g.minContract && rosterSpace > 3 || zVal < 1) {
+                            if (salarySpace <= g.minContract && rosterSpace > 2) {
                                 salarySpace = Math.max(g.minContract, salarySpace);
                             }
                             rosterSpace -= 1;
@@ -267,7 +278,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
         if (p.contract.amount > maxSalarySpace) {
             // accept reduced salary and play for just a year.
-            p.contract.amount = maxSalarySpace;
+            p.contract.amount = Math.max(maxSalarySpace * Math.random(), g.minContract);
             p.contract.exp = g.season + 1;
             console.log('Reduced salary for ', p.name, p.value, p.contract.amount, p.contract.exp);
         }
