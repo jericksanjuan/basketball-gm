@@ -1572,36 +1572,6 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         return false;
     }
 
-    /**
-     * Gives player value for cpu with fuzz
-     * @param  {Object} p    player object
-     * @param  {Number} fuzz value for cpu fuzz
-     * @return {Number}      player value with cpu fuzz
-     */
-    function cpuValue(p, fuzz) {
-        var age, current, ovr, pot, s;
-        current = p.valueNoPot * 0.9;
-        s = p.ratings.length - 1;
-        ovr = fuzzRating(p.ratings[s].ovr, fuzz);
-        pot = fuzzRating(p.ratings[s].pot, fuzz);
-
-        current = current + 0.1 * ovr;
-        age = (p.draft.year > g.season) ? p.draft.year - p.born.year : g.season - p.born.year;
-
-        return adjustValue(age, pot, current);
-    }
-
-    function cpuGenContract(p, fuzz) {
-        var contract, mp;
-        mp = {};
-        mp.value = cpuValue(p, fuzz);
-        mp.born = p.born;
-        mp.ratings = p.ratings;
-        contract = genContract(mp);
-        contract.amount = Math.ceil((contract.amount + 2 * p.contract.amount) / 3);
-        return contract;
-    }
-
     function adjustValue(age, potential, current) {
         // If performance is already exceeding predicted potential, just use that
         if (current >= potential && age < 29) {
@@ -1650,6 +1620,36 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         if (age > 33) {
             return 0.7 * current;
         }
+    }
+
+    /**
+     * Gives player value for cpu with fuzz
+     * @param  {Object} p    player object
+     * @param  {Number} fuzz value for cpu fuzz
+     * @return {Number}      player value with cpu fuzz
+     */
+    function cpuValue(p, fuzz) {
+        var age, current, ovr, pot, s;
+        current = p.valueNoPot * 0.9;
+        s = p.ratings.length - 1;
+        ovr = fuzzRating(p.ratings[s].ovr, fuzz);
+        pot = fuzzRating(p.ratings[s].pot, fuzz);
+
+        current = current + 0.1 * ovr;
+        age = (p.draft.year > g.season) ? p.draft.year - p.born.year : g.season - p.born.year;
+
+        return adjustValue(age, pot, current);
+    }
+
+    function cpuGenContract(p, fuzz) {
+        var contract, mp;
+        mp = {};
+        mp.value = cpuValue(p, fuzz);
+        mp.born = p.born;
+        mp.ratings = p.ratings;
+        contract = genContract(mp);
+        contract.amount = Math.ceil((contract.amount + 2 * p.contract.amount) / 3);
+        return contract;
     }
 
     /**
@@ -1725,13 +1725,13 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         if (options.withContract) {
             if (ps.length > 0) {
                 if (ps.length === 1) {
-                    return ps[0].ewa * 2000 - p.contract.amount;
-
+                    current = ps[0].ewa * 2000 - p.contract.amount;
                 } else {
                     ps1 = ps[0];
                     ps2 = ps[1];
-                    return ((2 * ps1 + ps2) / 3) * 2000 - p.contract.amount
+                    current = ((2 * ps1 + ps2) / 3) * 2000 - p.contract.amount;
                 }
+                return current;
             }
         }
 
