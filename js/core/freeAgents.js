@@ -108,9 +108,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
     function makeOffer(t, players, toRelease) {
         toRelease = toRelease || false;
         return Promise.try(function () {
-            var baseScore, fp, i, needs, offerCond, offered, offers, playerGrade, pp, rosterSpace, salarySpace, zContract, zVal;
+            var baseScore, fp, i, needs, offerCond, offers, playerGrade, pp, rosterSpace, salarySpace, zContract, zVal;
             offers = [];
-            offered = [];
             fp = helpers.deepCopy(players);
 
             needs = teamNeeds(t.fa.compositeRating);
@@ -124,11 +123,10 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             salarySpace = t.fa.salarySpace;
             rosterSpace = t.fa.rosterSpace;
 
-                // filter by salary
-                pp = fp.filter(function (p) {
-                    return p.contract.amount <= salarySpace &&
-                        offered.indexOf(p.pid) < 0;
-                });
+            // filter by salary
+            pp = fp.filter(function (p) {
+                return p.contract.amount <= salarySpace;
+            });
 
             if (pp.length > 0) {
                 // sort by grade and value;
@@ -148,9 +146,10 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
                 for (i = 0; i < pp.length; i++)  {
                     console.log(pp[i].value, pp[i].name, g.teamAbbrevsCache[t.tid], pp[i].signingScore, baseScore);
-                    if (pp[i].signingScore >= baseScore) {
+                    if (pp[i].signingScore >= baseScore || toRelease ) {
+                        // toRelease = go over the roster limit to sign a free agent
+                        // given that you have salary space available.
                         zContract = player.cpuGenContract(pp[i], t.fuzzValue);
-                        // zContract.amount = Math.min(zContract.amount, salarySpace);
                         if (zContract.amount <= salarySpace) {
                             offers.push({
                                 tid: t.tid,
@@ -166,7 +165,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                                 salarySpace = Math.max(g.minContract, salarySpace);
                             }
                             rosterSpace -= 1;
-                            offered.push(pp[i].pid);
                         }
                     } else {
                         i = pp.length;
@@ -326,13 +324,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                         if (teams[i].tid !== g.userTid || g.autoPlaySeasons > 0) {
                             offers.push(makeOffer(teams[i], players));
                         }
+                    } else if (teams[i].fa.rosterSpace === 0 && teams[i].fa.salarySpace > g.minContract) {
+                        if (teams[i].tid !== g.userTid || g.autoPlaySeasons > 0) {
+                            teams[i].fa.rosterSpace = 1;
+                            offers.push(makeOffer(teams[i], players, true));
+                        }
                     }
-                    // else if (teams[i].fa.rosterSpace === 0 && teams[i].fa.salarySpace > g.minContract) {
-                    //     if (teams[i].tid !== g.userTid || g.autoPlaySeasons > 0) {
-                    //         teams[i].fa.rosterSpace = 1;
-                    //         offers.push(makeOffer(teams[i], players, true));
-                    //     }
-                    // }
                 }
 
                 return Promise.all(offers)

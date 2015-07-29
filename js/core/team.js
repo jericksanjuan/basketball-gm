@@ -359,6 +359,13 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         });
     }
 
+    function allRostersAutoSort() {
+        var tx = dao.tx("players", "readwrite");
+        return Promise.all(_.range(30), function(tid) {
+                    return rosterAutoSort(tx, tid);
+                });
+    }
+
     /**
     * Gets all the contracts a team owes.
     *
@@ -1466,6 +1473,7 @@ console.log(dv);*/
         updateStrategies: updateStrategies,
         checkRosterSizes: checkRosterSizes,
         getPayroll: getPayroll,
-        getPayrolls: getPayrolls
+        getPayrolls: getPayrolls,
+        allRostersAutoSort: allRostersAutoSort
     };
 });

@@ -42,7 +42,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
     }
 
     function newPhasePreseason(tx) {
-        return freeAgents.autoSign(tx).then(function () { // Important: do this before changing the season or contracts and stats are fucked up
+        return team.allRostersAutoSort().then(function () { // Important: do this before changing the season or contracts and stats are fucked up
             return require("core/league").setGameAttributes(tx, {season: g.season + 1});
         }).then(function () {
             var coachingRanks, scoutingRank;
