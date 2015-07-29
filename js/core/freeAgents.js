@@ -8,6 +8,33 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
     var CPU_RESIGN_CUTOFF = 0.6;
     var OFFER_GRADE_CUTOFF = 0.9;
 
+
+    function gradeComposite (composite) {
+        composite = _.omit(composite, ['pace', 'usage', 'turnovers', 'fouling']);
+        composite = _.filter(_.values(composite), function (v) {
+            return v > 0.6;
+        });
+        return composite.length / 10;
+    };
+
+    function gradePlayer(p) {
+        var age, composite, grade, potential, roster, skill, zAge;
+        zAge = g.season - p.born.year;
+        age = (4 - (zAge - 24)) / 4.0;
+        composite = gradeComposite(playerComposite(p.ratings));
+        skill = p.ratings[p.ratings.length - 1].skills.length / 2;
+        potential = (p.ratings[p.ratings.length - 1].pot -
+            p.ratings[p.ratings.length - 1].ovr) / 10;
+        roster = (14 - p.rosterOrder) / 14.0;
+        grade = (age + 1.5 * composite + potential + 0.5 * roster + 2 * skill) / 6;
+        // if(grade > 0.6) {
+        //     console.log('age:', age, 'composite:', composite,
+        //         'potential:', potential, 'roster:', roster, 'skill:', skill,
+        //         'grade', grade, 'name:', p.name, p.value, zAge);
+        // }
+        return grade;
+    };
+
     /**
      * Exclude fields in searching for players.
      * @param  {object} compositeRatings objects with keys and values for composite player ratings.
@@ -53,15 +80,16 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         return _.difference(needsCopy, diff).slice(0, 5);
     }
 
-    function makeOffer(t, players) {
+    function makeOffer(t, players, toRelease) {
+        toRelease = toRelease || false;
         return Promise.try(function () {
-            var fp, i, needs, offered, offers, pp, rosterSpace, salarySpace, zContract, zVal;
+            var fp, i, needs, offerCond, offered, offers, playerGrade, pp, rosterSpace, salarySpace, zContract, zVal;
             offers = [];
             offered = [];
             fp = helpers.deepCopy(players);
 
             needs = teamNeeds(t.fa.compositeRating);
-            if (g.daysLeft < 10 && t.fa.rosterSpace > 3) {
+            if (g.daysLeft < 10 && t.fa.rosterSpace > 3 && !toRelease) {
                 needs = needs;
                 zVal = g.daysLeft / 10;
             } else {
@@ -85,24 +113,42 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                         r = b.valueWithContract - a.valueWithContract;
                         return (r === 0) ? b.compositeRating[needs[i]] - a.compositeRating[needs[i]] : r;
                     });
-                    // TODO: offer amount and exp depending on own fuzz value of player.
-                    zContract = player.cpuGenContract(pp[0], t.fuzzValue);
-                    zContract.amount = Math.min(zContract.amount, salarySpace);
-                    // console.log('zContract', zContract.amount, pp[0].contract.amount);
-                    offers.push({
-                        tid: t.tid,
-                        pid: pp[0].pid,
-                        amount: zContract.amount,
-                        exp: (zVal < 1) ? g.season + 1 : zContract.exp,
-                        skill: needs[i]
-                    });
-                    salarySpace = Math.max(0, salarySpace - zContract.amount);
-                    // Only offer min contracts when salarySpace is low.
-                    if (zVal < 1 || t.fa.salarySpace <= g.minContract) {
-                        salarySpace = Math.max(g.minContract, salarySpace);
+
+                    if (toRelease) {
+                        playerGrade = gradePlayer(pp[0]);
+                        console.log(pp[0], playerGrade);
+                        offerCond = playerGrade > (OFFER_GRADE_CUTOFF - 0.083);
+                    } else {
+                        offerCond = true;
                     }
-                    rosterSpace -= 1;
-                    offered.push(pp[0].pid);
+
+                    if (offerCond) {
+                        if (toRelease) {
+                            console.log(pp[0].name, 'passes grade, will sign.');
+                        }
+                        zContract = player.cpuGenContract(pp[0], t.fuzzValue);
+                        zContract.amount = Math.min(zContract.amount, salarySpace);
+
+                        offers.push({
+                            tid: t.tid,
+                            pid: pp[0].pid,
+                            amount: zContract.amount,
+                            exp: (zVal < 1) ? g.season + 1 : zContract.exp,
+                            skill: needs[i],
+                            toRelease: toRelease
+                        });
+                        salarySpace = Math.max(0, salarySpace - zContract.amount);
+                        // Only offer min contracts when salarySpace is low.
+                        if (zVal < 1 || t.fa.salarySpace <= g.minContract) {
+                            salarySpace = Math.max(g.minContract, salarySpace);
+                        }
+                        rosterSpace -= 1;
+                        offered.push(pp[0].pid);
+                    } else {
+                        // toRelease is true but BPA has failing grade
+                        rosterSpace = 0;
+                        console.log(pp[0].name, 'fails test.');
+                    }
                     if (rosterSpace === 0) {
                         i = needs.length;
                     }
@@ -139,6 +185,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     t.fa.salarySpace = Math.max(0, t.fa.salarySpace - amount);
                     t.fa.salarySpace = Math.max(t.fa.salarySpace, g.minContract);
                     t.fa.rosterSpace -= 1;
+                    t.fa.rosterSpace = Math.max(0, t.fa.rosterSpace);
                     t.fa.compositeRating[skill] += skillValue;
                     t.fa.compositeRating[skill] /= 2;
                     return dao.teams.put({
@@ -172,7 +219,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                             ot: tx,
                             value: p
                         })
-                        .thenReturn(null);
+                        .then(function() {
+                            return team.rosterAutoSort(tx, offer.tid);
+                        });
                 });
         };
 
@@ -189,7 +238,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
 
         goContract = Math.random() > 0.95 - +desiredMet * 0.3 - (1 - g.daysLeft / 30);
         if (goContract && offers.length > 0) {
-            console.log(p.name, offers.length, offers[0].amount, g.teamAbbrevsCache[offers[0].tid], offers[0].grade);
+            console.log(p.name, offers.length, offers[0].amount, g.teamAbbrevsCache[offers[0].tid], offers[0].grade, offers[0].toRelease);
             return acceptContract(offers[0]);
         }
 
@@ -248,9 +297,14 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 // end debug
 
                 for (i = 0; i < teams.length; i++) {
-                    if (teams[i].fa.rosterSpace > 0) {
+                    if (teams[i].fa.rosterSpace > 0 ) {
                         if (teams[i].tid !== g.userTid || g.autoPlaySeasons > 0) {
                             offers.push(makeOffer(teams[i], players));
+                        }
+                    } else if (teams[i].fa.rosterSpace === 0 && teams[i].fa.salarySpace > g.minContract) {
+                        if (teams[i].tid !== g.userTid || g.autoPlaySeasons > 0) {
+                            teams[i].fa.rosterSpace = 1;
+                            offers.push(makeOffer(teams[i], players, true));
                         }
                     }
                 }
@@ -259,9 +313,10 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     .then(function (offers) {
                         offers = _.flatten(offers);
                         offers = _.sortBy(offers, 'pid');
-                        if (offers.length === 0) {
-                            return;
-                        }
+                        // if (offers.length === 0) {
+                        //     return;
+                        // }
+                        console.log('offers count', offers.length, _.pluck(offers, 'tid'));
                         return Promise.each(players, function (p) {
                             return decideContract(tx, p, offers, maxSalarySpace);
                         });
@@ -379,44 +434,24 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
      * Try to resign players for the cpu and user teams (if autoplay)
      */
     function cpuResignPlayers(tx, baseMoods) {
-        var eventReleased, eventResigned, gradeComposite, gradePlayer, resignPlayers, signOverLuxuryTax, signPlayer, updatePlayer;
+        var eventReleased, eventResigned, resignPlayers, signOverLuxuryTax, signPlayer, updatePlayer;
         tx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "releasedPlayers", "teams"], "readwrite", tx);
 
         updatePlayer = function (p) {
+            var resigned = false;
             // console.log((p.tid === -1) ? 'FA' : p.tid, p.name, p.contract.amount, p.contract.exp);
             if (p.tid !== -1) {
+                resigned = true;
                 eventResigned(p);
             }
             dao.players.put({
                 ot: tx,
                 value: p
-            }).thenReturn(null);
-        };
-
-        gradeComposite = function (composite) {
-            composite = _.omit(composite, ['pace', 'usage', 'turnovers', 'fouling']);
-            composite = _.filter(_.values(composite), function (v) {
-                return v > 0.6;
+            }).then(function() {
+                if (resigned) {
+                    return team.rosterAutoSort(tx, p.tid);
+                }
             });
-            return composite.length / 10;
-        };
-
-        gradePlayer = function (p) {
-            var age, composite, grade, potential, roster, skill, zAge;
-            zAge = g.season - p.born.year;
-            age = (4 - (zAge - 24)) / 4.0;
-            composite = gradeComposite(playerComposite(p.ratings));
-            skill = p.ratings[p.ratings.length - 1].skills.length / 2;
-            potential = (p.ratings[p.ratings.length - 1].pot -
-                p.ratings[p.ratings.length - 1].ovr) / 10;
-            roster = (14 - p.rosterOrder) / 14.0;
-            grade = (age + 1.5 * composite + potential + 0.5 * roster + 2 * skill) / 6;
-            // if(grade > 0.6) {
-            //     console.log('age:', age, 'composite:', composite,
-            //         'potential:', potential, 'roster:', roster, 'skill:', skill,
-            //         'grade', grade, 'name:', p.name, p.value, zAge);
-            // }
-            return grade;
         };
 
         eventResigned = function (p) {
@@ -504,7 +539,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods, false);
 
                     if (grade > CPU_RESIGN_CUTOFF) {
-                        zContract = player.cpuGenContract(p, fuzzValues[i]);
+                        zContract = player.cpuGenContract(p, fuzzValues[i] || player.genFuzz(15.5));
                         offer = {
                             tid: i,
                             pid: p.pid,
@@ -789,21 +824,19 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
 
             // This is called if there are remaining days to simulate
             cbYetAnother = function () {
-                decreaseDemands().then(function () {
-                    autoSign().then(function () {
-                        require("core/league").setGameAttributesComplete({
-                            daysLeft: g.daysLeft - 1,
-                            lastDbChange: Date.now()
-                        }).then(function () {
-                            if (g.daysLeft > 0 && numDays > 0) {
-                                ui.realtimeUpdate(["playerMovement"], undefined, function () {
-                                    ui.updateStatus(g.daysLeft + " days left");
-                                    play(numDays - 1, false);
-                                });
-                            } else if (g.daysLeft === 0) {
-                                cbNoDays();
-                            }
-                        });
+                tickFreeAgencyDay().then(function() {
+                    require("core/league").setGameAttributesComplete({
+                        daysLeft: g.daysLeft - 1,
+                        lastDbChange: Date.now()
+                    }).then(function () {
+                        if (g.daysLeft > 0 && numDays > 0) {
+                            ui.realtimeUpdate(["playerMovement"], undefined, function () {
+                                ui.updateStatus(g.daysLeft + " days left");
+                                play(numDays - 1, false);
+                            });
+                        } else if (g.daysLeft === 0) {
+                            cbNoDays();
+                        }
                     });
                 });
             };
