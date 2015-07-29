@@ -83,7 +83,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                         return (r === 0) ? b.compositeRating[needs[i]] - a.compositeRating[needs[i]] : r;
                     });
                     // TODO: offer amount and exp depending on own fuzz value of player.
-                    zContract = player.cpuGenContract(pp[0], t.fa.fuzzValue);
+                    zContract = player.cpuGenContract(pp[0], t.fuzzValue);
                     zContract.amount = Math.min(zContract.amount, salarySpace);
                     // console.log('zContract', zContract.amount, pp[0].contract.amount);
                     offers.push({
@@ -109,22 +109,23 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         });
     }
 
+    function gradeOffer(offer, p) {
+        var amount, exp, mood, yr, yrOff;
+        yrOff = offer.exp - g.season;
+        yr = p.contract.exp - g.season;
+        amount = offer.amount / p.contract.amount;
+        exp = (yr - Math.abs(yrOff - yr)) / yr;
+        mood = 1 - p.freeAgentMood[offer.tid] / 2.5;
+        offer.grade = (2 * amount + 0.5 * exp + mood) / 3.5;
+        console.log(amount, exp, mood);
+        return offer.grade;
+    };
+
     function decideContract(tx, p, offers, maxSalarySpace) {
-        var acceptContract, goContract, gradeOffer, teamUpdate;
+        var acceptContract, goContract, teamUpdate;
         offers = _.where(offers, {
             pid: p.pid
         });
-
-        gradeOffer = function (offer) {
-            var amount, exp, mood, yr, yrOff;
-            yrOff = offer.exp - g.season;
-            yr = p.contract.exp - g.season;
-            // (2*0.9 + 0.5*(3-abs(3-3))/3. + (1 - -0.25/2.5))/3.5
-            amount = offer.amount / p.contract.amount;
-            exp = (yr - Math.abs(yrOff - yr)) / yr;
-            mood = 1 - p.freeAgentMood[offer.tid] / 2.5;
-            offer.grade = (2 * amount + 0.5 * exp + mood) / 3.5;
-        };
 
         teamUpdate = function (tid, amount, skill, skillValue) {
             return dao.teams.get({
@@ -176,7 +177,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         goContract = Math.random() > 0.6 - (1 - g.daysLeft / 30);
         if (goContract && offers.length > 0) {
             // grade the offers
-            offers.map(gradeOffer);
+            offers.map(function(o) { return gradeOffer(o, p);});
             offers.sort(function (a, b) {
                 return b.grade - a.grade;
             });
@@ -239,7 +240,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 // end debug
 
                 for (i = 0; i < teams.length; i++) {
-                    if (teams[i].fa.rosterSpace > 0) {
+                    if (teams[i].fa.rosterSpace > 0 && (g.autoPlaySeasons === 0 && i === g.userTid)) {
                         offers.push(makeOffer(teams[i], players));
                     }
                 }
@@ -303,7 +304,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             team.fa.salarySpace = Math.max(0, g.salaryCap - sumContracts(t.player));
             team.fa.salarySpace = Math.max(team.fa.salarySpace, g.minContract);
 
-            team.fa.fuzzValue = player.genFuzz(t.scoutingRank);
+            // ensure fuzzValue exist.
+            team.fuzzValue = team.fuzzValue || player.genFuzz(t.scoutingRank);
             return team;
         };
 
@@ -429,26 +431,28 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             });
         };
 
-        signPlayer = function (p, tid) {
-            p.tid = tid;
+        signPlayer = function (p, offer) {
+            p.contract.amount = offer.amount;
+            p.contract.exp = offer.exp;
+            p.tid = offer.tid;
             p = player.setContract(p, p.contract, true);
             p.gamesUntilTradable = 15;
         };
 
-        signOverLuxuryTax = function (p, tid, grade, strategy, cash) {
+        signOverLuxuryTax = function (p, offer, grade, strategy, cash) {
             if (strategy === 'rebuilding') {
                 if (grade > 1.0) {
-                    signPlayer(p, tid);
+                    signPlayer(p, offer);
                     console.log('rebuilding', 'resigned', p.name);
                 }
             } else {
                 if (cash > 0) {
-                    signPlayer(p, tid);
+                    signPlayer(p, offer);
                 }
                 if (grade > 9.0) {
-                    signPlayer(p, tid);
+                    signPlayer(p, offer);
                 }
-                if (p.tid === tid) {
+                if (p.tid === offer.tid) {
                     console.log('contending', 'resigned', p.name);
                 }
             }
@@ -456,15 +460,16 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             if (p.tid === -1) {
                 // announce released of high grade FA.
                 console.log(p.name, 'released', grade, strategy, cash);
-                eventReleased(p, tid);
+                eventReleased(p, offer.tid);
             }
         };
 
         resignPlayers = function (teams, players) {
-            var cash, i, salarySpace, strategies, toUpdate, tp, tpCopy;
+            var cash, fuzzValues, i, salarySpace, strategies, toUpdate, tp, tpCopy;
 
             toUpdate = [];
             strategies = _.pluck(teams, 'strategy');
+            fuzzValues = _.pluck(teams, 'fuzzValue');
             cash = teams.map(function (t) {
                 return _.last(t.seasons).cash;
             });
@@ -472,6 +477,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
 
             for (i = 0; i < 30; i++) {
                 tp = players[i];
+
+                // Skip user team if not on autoplay.
+                if (g.autoPlaySeasons === 0 && i === g.userTid) {
+                    tp = [];
+                }
+
                 tpCopy = tp.slice();
                 tp = _.sortBy(tp, 'value').reverse();
                 tp = _.filter(tp, function (p) {
@@ -480,18 +491,30 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 tpCopy = _.difference(tpCopy, tp);
                 salarySpace = g.salaryCap - sumContracts(tpCopy);
                 _.each(tp, function (p) {
-                    var grade;
+                    var grade, offer, offerGrade, zContract;
                     grade = gradePlayer(p);
                     player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods, false);
-                    if (p.freeAgentMood[i] > 1.25) {
-                        console.log(p.name, 'refuses to sign.');
-                    }
-                    if (grade > 0.6 && p.freeAgentMood[i] < 1.25) {
-                        if (salarySpace + p.contract.amount > g.luxuryPayroll) {
-                            signOverLuxuryTax(p, i, grade, strategies[i], cash[i]);
-                        } else {
-                            signPlayer(p, i);
+
+                    if (grade > 0.6) {
+                        zContract = player.cpuGenContract(p, fuzzValues[i]);
+                        offer = {
+                            tid: i,
+                            pid: p.pid,
+                            amount: zContract.amount,
+                            exp: zContract.exp
                         }
+                        offerGrade = gradeOffer(offer, p);
+                        console.log(offerGrade);
+                        if (offerGrade > 0.90) {
+                            if (salarySpace + p.contract.amount > g.luxuryPayroll) {
+                                signOverLuxuryTax(p, offer, grade, strategies[i], cash[i]);
+                            } else {
+                                signPlayer(p, offer);
+                            }
+                        } else {
+                            console.log(p.name, 'refuses to sign with', g.teamAbbrevsCache[i],  offerGrade);
+                        }
+
                     }
                 });
                 toUpdate = toUpdate.concat(tp);

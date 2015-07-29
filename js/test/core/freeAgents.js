@@ -47,11 +47,16 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents", 'lib/underscor
 
         describe('cpuResignPlayers', function() {
             it('should resign players.', function() {
-                var player, tx;
-                tx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "releasedPlayers", "teams"], "readwrite");
+                var player, team, tx;
+                tx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "playerStats", "releasedPlayers", "teams"], "readwrite");
 
                 player = require('core/player');
-                return player.genBaseMoods(tx)
+                team = require('core/team');
+                // to have fuzzValue and strategy updated.
+                return team.updateStrategies(tx)
+                .then(function() {
+                    return player.genBaseMoods(tx)
+                })
                 .then(function(baseMoods) {
                     oBaseMoods = baseMoods;
                     return fa.cpuResignPlayers(tx, baseMoods);
@@ -67,13 +72,12 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents", 'lib/underscor
 
         describe('readyPlayersFA', function() {
             it('should ready players for FA', function() {
-                console.log('obaseMoods', oBaseMoods);
                 return fa.readyPlayersFA(null, oBaseMoods);
             });
         });
 
         describe('tickFreeAgencyDay', function() {
-            it('should do task for a FA day', function() {
+            it.skip('should do task for a FA day', function() {
                 var Promise = require('lib/bluebird');
                 return Promise.each(_.range(30), function() {
                     return fa.tickFreeAgencyDay()

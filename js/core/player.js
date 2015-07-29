@@ -1649,6 +1649,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         mp.ratings = p.ratings;
         contract = genContract(mp);
         contract.amount = Math.ceil((contract.amount + 2 * p.contract.amount) / 3);
+        contract.exp = contract.exp + 1;
         return contract;
     }
 

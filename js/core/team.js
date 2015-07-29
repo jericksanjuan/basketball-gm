@@ -1274,7 +1274,7 @@ console.log(dv);*/
                 var dWon, s, won;
 
                 // Skip user's team
-                if (t.tid === g.userTid) {
+                if (t.tid === g.userTid && g.autoPlaySeasons === 0) {
                     return;
                 }
 
@@ -1295,7 +1295,7 @@ console.log(dv);*/
                     statsSeasons: [g.season],
                     statsTid: t.tid
                 }).then(function (players) {
-                    var age, denominator, i, numerator, score, updated, youngStar;
+                    var age, denominator, i, numerator, score, scoutingRank, updated, youngStar;
 
                     players = player.filter(players, {
                         season: g.season,
@@ -1331,6 +1331,12 @@ console.log(dv);*/
                         t.strategy = "rebuilding";
                         updated = true;
                     }
+
+
+                    scoutingRank = t.seasons[s].expenses.scouting.rank;
+                    // assign fuzz value for this season
+                    t.fuzzValue = player.genFuzz(scoutingRank);
+                    updated = true;
 
                     if (updated) {
                         return t;
