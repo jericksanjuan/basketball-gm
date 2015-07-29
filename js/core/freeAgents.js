@@ -55,7 +55,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         var composite, gp;
         gp = gradePlayer(p, true);
         composite = compareComposites(p.compositeRating, t.fa.compositeRating, needs)
-        p.signingScore = (gp[0] + 2 * composite + gp[1] + 2 * gp[2]) / 6;
+        p.signingScore = (0.5 * gp[0] + 2 * composite + 1.5 * gp[1] + gp[2]) / 5.0;
+        // console.log(p.name, gp[0], composite, gp[1], gp[2]);
         return p.signingScore;
     }
 
@@ -107,15 +108,15 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
     function makeOffer(t, players, toRelease) {
         toRelease = toRelease || false;
         return Promise.try(function () {
-            var fp, i, needs, offerCond, offered, offers, playerGrade, pp, rosterSpace, salarySpace, zContract, zVal;
+            var baseScore, fp, i, needs, offerCond, offered, offers, playerGrade, pp, rosterSpace, salarySpace, zContract, zVal;
             offers = [];
             offered = [];
             fp = helpers.deepCopy(players);
 
             needs = teamNeeds(t.fa.compositeRating);
-            if (g.daysLeft < 10 && t.fa.rosterSpace > 3 && !toRelease) {
+            if (g.daysLeft <= 10 && t.fa.rosterSpace > 0 && !toRelease) {
                 needs = needs;
-                zVal = g.daysLeft / 10;
+                zVal = (g.daysLeft - 1) / 10;
             } else {
                 needs = groupNeeds(needs, 5);
                 zVal = 1;
@@ -140,9 +141,14 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     return (r === 0) ? b.valueWithContract - a.valueWithContract : r;
                 });
 
+                baseScore =  0.6 + zVal * 0.2;
+                if (rosterSpace > 3 && pp[0].signingScore < baseScore) {
+                    baseScore = pp[rosterSpace - 4].signingScore;
+                }
+
                 for (i = 0; i < pp.length; i++)  {
-                    console.log(pp[i].value, pp[i].signingScore, pp[i].name, t.tid);
-                    if (pp[i].signingScore > 0.55 || true) {
+                    console.log(pp[i].value, pp[i].name, g.teamAbbrevsCache[t.tid], pp[i].signingScore, baseScore);
+                    if (pp[i].signingScore >= baseScore) {
                         zContract = player.cpuGenContract(pp[i], t.fuzzValue);
                         // zContract.amount = Math.min(zContract.amount, salarySpace);
                         if (zContract.amount <= salarySpace) {
@@ -162,6 +168,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                             rosterSpace -= 1;
                             offered.push(pp[i].pid);
                         }
+                    } else {
+                        i = pp.length;
                     }
 
                     if (rosterSpace < 1 || salarySpace <= g.minContract) {
@@ -383,7 +391,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
             team.fa.compositeRating = teamComposite(t.player, 7);
             // team.fa.synergy
-            team.fa.rosterSpace = Math.max(0, 14 - t.player.length);
+            team.fa.rosterSpace = Math.max(0, 15 - t.player.length);
             team.fa.salarySpace = Math.max(0, g.salaryCap - sumContracts(t.player));
             team.fa.salarySpace = Math.max(team.fa.salarySpace, g.minContract);
 
