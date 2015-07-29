@@ -5,6 +5,9 @@
 define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, game, Promise, _, eventLog, helpers, lock, random) {
     "use strict";
 
+    var CPU_RESIGN_CUTOFF = 0.6;
+    var OFFER_GRADE_CUTOFF = 0.9;
+
     /**
      * Exclude fields in searching for players.
      * @param  {object} compositeRatings objects with keys and values for composite player ratings.
@@ -121,7 +124,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
     };
 
     function decideContract(tx, p, offers, maxSalarySpace) {
-        var acceptContract, goContract, teamUpdate;
+        var acceptContract, desiredMet, goContract, teamUpdate;
         offers = _.where(offers, {
             pid: p.pid
         });
@@ -173,13 +176,19 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 });
         };
 
-        goContract = Math.random() > 0.6 - (1 - g.daysLeft / 30);
-        if (goContract && offers.length > 0) {
-            // grade the offers
+        // grade the offers
+        if (offers.length > 0) {
             offers.map(function(o) { return gradeOffer(o, p);});
             offers.sort(function (a, b) {
                 return b.grade - a.grade;
             });
+            desiredMet = offers[0].grade > OFFER_GRADE_CUTOFF;
+        } else {
+            desiredMet = false;
+        }
+
+        goContract = Math.random() > 0.95 - +desiredMet * 0.3 - (1 - g.daysLeft / 30);
+        if (goContract && offers.length > 0) {
             console.log(p.name, offers.length, offers[0].amount, g.teamAbbrevsCache[offers[0].tid], offers[0].grade);
             return acceptContract(offers[0]);
         }
@@ -241,9 +250,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 for (i = 0; i < teams.length; i++) {
                     if (teams[i].fa.rosterSpace > 0) {
                         if (teams[i].tid !== g.userTid || g.autoPlaySeasons > 0) {
-                            if(teams[i] === g.userTid) {
-                                console.log('why', g.autoPlaySeasons);
-                            }
                             offers.push(makeOffer(teams[i], players));
                         }
                     }
@@ -253,7 +259,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     .then(function (offers) {
                         offers = _.flatten(offers);
                         offers = _.sortBy(offers, 'pid');
-                        console.log('offers count', offers.length);
                         if (offers.length === 0) {
                             return;
                         }
@@ -358,7 +363,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 index: "tid",
                 key: IDBKeyRange.bound(g.PLAYER.UNDRAFTED, g.PLAYER.FREE_AGENT),
                 callback: function (p) {
-                    p.offers = [];
                     p.compositeRating = playerComposite(p.ratings);
                     return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
                 }
@@ -499,7 +503,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                     grade = gradePlayer(p);
                     player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods, false);
 
-                    if (grade > 0.6) {
+                    if (grade > CPU_RESIGN_CUTOFF) {
                         zContract = player.cpuGenContract(p, fuzzValues[i]);
                         offer = {
                             tid: i,
@@ -508,7 +512,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                             exp: zContract.exp
                         }
                         offerGrade = gradeOffer(offer, p);
-                        if (offerGrade > 0.90) {
+                        if (offerGrade > OFFER_GRADE_CUTOFF) {
                             if (salarySpace + p.contract.amount > g.luxuryPayroll) {
                                 signOverLuxuryTax(p, offer, grade, strategies[i], cash[i]);
                             } else {
