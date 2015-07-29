@@ -117,7 +117,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         exp = (yr - Math.abs(yrOff - yr)) / yr;
         mood = 1 - p.freeAgentMood[offer.tid] / 2.5;
         offer.grade = (2 * amount + 0.5 * exp + mood) / 3.5;
-        console.log(amount, exp, mood);
         return offer.grade;
     };
 
@@ -181,7 +180,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
             offers.sort(function (a, b) {
                 return b.grade - a.grade;
             });
-            console.log(p.name, offers.length, offers[0].amount, g.teamAbbrevsCache[offers[0].tid]);
+            console.log(p.name, offers.length, offers[0].amount, g.teamAbbrevsCache[offers[0].tid], offers[0].grade);
             return acceptContract(offers[0]);
         }
 
@@ -240,8 +239,13 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 // end debug
 
                 for (i = 0; i < teams.length; i++) {
-                    if (teams[i].fa.rosterSpace > 0 && (g.autoPlaySeasons === 0 && i === g.userTid)) {
-                        offers.push(makeOffer(teams[i], players));
+                    if (teams[i].fa.rosterSpace > 0) {
+                        if (teams[i].tid !== g.userTid || g.autoPlaySeasons > 0) {
+                            if(teams[i] === g.userTid) {
+                                console.log('why', g.autoPlaySeasons);
+                            }
+                            offers.push(makeOffer(teams[i], players));
+                        }
                     }
                 }
 
@@ -375,7 +379,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         tx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "releasedPlayers", "teams"], "readwrite", tx);
 
         updatePlayer = function (p) {
-            console.log((p.tid === -1) ? 'FA' : p.tid, p.name, p.contract.amount, p.contract.exp);
+            // console.log((p.tid === -1) ? 'FA' : p.tid, p.name, p.contract.amount, p.contract.exp);
             if (p.tid !== -1) {
                 eventResigned(p);
             }
@@ -504,7 +508,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                             exp: zContract.exp
                         }
                         offerGrade = gradeOffer(offer, p);
-                        console.log(offerGrade);
                         if (offerGrade > 0.90) {
                             if (salarySpace + p.contract.amount > g.luxuryPayroll) {
                                 signOverLuxuryTax(p, offer, grade, strategies[i], cash[i]);
