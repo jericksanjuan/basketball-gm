@@ -516,7 +516,7 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
                 // Create new draft class for 3 years in the future
                 return genPlayers(tx, g.PLAYER.UNDRAFTED_3);
             });
-        }
+        };
     }
 
     return {

@@ -482,26 +482,6 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
         return r;
     }
 
-    /**
-     * Load all teams into an array of team objects.
-     *
-     * The team objects contain all the information needed to simulate games. It would be more efficient if it only loaded team data for teams that are actually playing, particularly in the playoffs.
-     *
-     * @memberOf core.game
-     * @param {IDBObjectStore|IDBTransaction|null} ot An IndexedDB object store or transaction on players and teams; if null is passed, then a new transaction will be used.
-     * @param {Promise} Resolves to an array of team objects, ordered by tid.
-     */
-    function loadTeams(ot) {
-        var promises, tid;
-        promises = [];
-
-        for (tid = 0; tid < g.numTeams; tid++) {
-            promises.push(loadTeam(tid, ot));
-        }
-
-        return Promise.all(promises);
-    }
-
     function loadTeam(tid, ot, forFA) {
         forFA = forFA || false;
         return Promise.all([
@@ -600,6 +580,26 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
 
             return t;
         });
+    }
+
+    /**
+     * Load all teams into an array of team objects.
+     *
+     * The team objects contain all the information needed to simulate games. It would be more efficient if it only loaded team data for teams that are actually playing, particularly in the playoffs.
+     *
+     * @memberOf core.game
+     * @param {IDBObjectStore|IDBTransaction|null} ot An IndexedDB object store or transaction on players and teams; if null is passed, then a new transaction will be used.
+     * @param {Promise} Resolves to an array of team objects, ordered by tid.
+     */
+    function loadTeams(ot) {
+        var promises, tid;
+        promises = [];
+
+        for (tid = 0; tid < g.numTeams; tid++) {
+            promises.push(loadTeam(tid, ot));
+        }
+
+        return Promise.all(promises);
     }
 
     /**

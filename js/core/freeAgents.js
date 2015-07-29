@@ -176,7 +176,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
                 // accept reduced salary and play for just a year.
                 p.contract.amount = maxSalarySpace;
                 p.contract.exp = g.season + 1;
-                console.log('Reduced salary for ', p.name);
+                console.log('Reduced salary for ', p.name, p.value, p.contract.amount, p.contract.exp);
             }
 
             return dao.players.put({ot: tx, value: p})
@@ -767,6 +767,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/game", "lib/bl
         readyTeamsFA: readyTeamsFA,
         readyPlayersFA: readyPlayersFA,
         tickFreeAgencyDay: tickFreeAgencyDay,
-        cpuResignPlayers, cpuResignPlayers
+        cpuResignPlayers: cpuResignPlayers
     };
 });

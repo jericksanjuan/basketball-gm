@@ -2,14 +2,14 @@
  * @name test.core.draft
  * @namespace Tests for core.draft.
  */
-define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao, db, g, league, fa) {
+define(["dao", "db", "globals", "core/league", "core/freeAgents", 'lib/underscore'], function (dao, db, g, league, fa, _) {
     "use strict";
 
     describe("core/freeAgents", function () {
         var oBaseMoods;
         before(function () {
             return db.connectMeta().then(function () {
-                return league.create("Test", 20, undefined, 2015, false)
+                return league.create("Test", 20, undefined, 2015, false);
             });
         });
         before(function () {
@@ -47,9 +47,10 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
 
         describe('cpuResignPlayers', function() {
             it('should resign players.', function() {
-                var tx = dao.tx(["gameAttributes", "messages", "negotiations",  "players", "releasedPlayers", "teams"], "readwrite");
+                var player, tx;
+                tx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "releasedPlayers", "teams"], "readwrite");
 
-                var player = require('core/player');
+                player = require('core/player');
                 return player.genBaseMoods(tx)
                 .then(function(baseMoods) {
                     oBaseMoods = baseMoods;
@@ -77,7 +78,7 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
                 return Promise.each(_.range(30), function() {
                     return fa.tickFreeAgencyDay()
                         .then(function() {
-                            return require("core/league").setGameAttributesComplete({daysLeft: g.daysLeft - 1, lastDbChange: Date.now()})
+                            return require("core/league").setGameAttributesComplete({daysLeft: g.daysLeft - 1, lastDbChange: Date.now()});
                         });
                 });
             });
@@ -88,7 +89,7 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents"], function (dao
                 var p, player, v;
                 player = require('core/player');
                 p = {value: 80, valueNoPot: 70, ratings: [{ovr: 65, pot: 90}],
-                    draft: { year: 2014 }, born: {year: 1995 }};
+                    draft: {year: 2014}, born: {year: 1995}};
                 v = player.cpuValue(p, 10.5);
                 v = player.cpuGenContract(p, 2.5);
                 console.log(v);

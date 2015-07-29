@@ -607,7 +607,6 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
                 return; // No output
             });
         }
-
     }
 
     /**
@@ -1580,7 +1579,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
      * @return {Number}      player value with cpu fuzz
      */
     function cpuValue(p, fuzz) {
-        var age, current, currentold, currentp, ovr, pot, potp, s;
+        var age, current, ovr, pot, s;
         current = p.valueNoPot * 0.9;
         s = p.ratings.length - 1;
         ovr = fuzzRating(p.ratings[s].ovr, fuzz);
@@ -1601,6 +1600,56 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         contract = genContract(mp);
         contract.amount = Math.ceil((contract.amount + 2 * p.contract.amount) / 3);
         return contract;
+    }
+
+    function adjustValue(age, potential, current) {
+        // If performance is already exceeding predicted potential, just use that
+        if (current >= potential && age < 29) {
+            return current;
+        }
+
+        if (age <= 19) {
+            return 0.8 * potential + 0.2 * current;
+        }
+        if (age === 20) {
+            return 0.7 * potential + 0.3 * current;
+        }
+        if (age === 21) {
+            return 0.5 * potential + 0.5 * current;
+        }
+        if (age === 22) {
+            return 0.3 * potential + 0.7 * current;
+        }
+        if (age === 23) {
+            return 0.15 * potential + 0.85 * current;
+        }
+        if (age === 24) {
+            return 0.1 * potential + 0.9 * current;
+        }
+        if (age === 25) {
+            return 0.05 * potential + 0.95 * current;
+        }
+        if (age > 25 && age < 29) {
+            return current;
+        }
+        if (age === 29) {
+            return 0.975 * current;
+        }
+        if (age === 30) {
+            return 0.95 * current;
+        }
+        if (age === 31) {
+            return 0.9 * current;
+        }
+        if (age === 32) {
+            return 0.85 * current;
+        }
+        if (age === 33) {
+            return 0.8 * current;
+        }
+        if (age > 33) {
+            return 0.7 * current;
+        }
     }
 
     /**
@@ -1698,56 +1747,6 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         }
 
         return adjustValue(age, potential, current);
-    }
-
-    function adjustValue(age, potential, current) {
-        // If performance is already exceeding predicted potential, just use that
-        if (current >= potential && age < 29) {
-            return current;
-        }
-
-        if (age <= 19) {
-            return 0.8 * potential + 0.2 * current;
-        }
-        if (age === 20) {
-            return 0.7 * potential + 0.3 * current;
-        }
-        if (age === 21) {
-            return 0.5 * potential + 0.5 * current;
-        }
-        if (age === 22) {
-            return 0.3 * potential + 0.7 * current;
-        }
-        if (age === 23) {
-            return 0.15 * potential + 0.85 * current;
-        }
-        if (age === 24) {
-            return 0.1 * potential + 0.9 * current;
-        }
-        if (age === 25) {
-            return 0.05 * potential + 0.95 * current;
-        }
-        if (age > 25 && age < 29) {
-            return current;
-        }
-        if (age === 29) {
-            return 0.975 * current;
-        }
-        if (age === 30) {
-            return 0.95 * current;
-        }
-        if (age === 31) {
-            return 0.9 * current;
-        }
-        if (age === 32) {
-            return 0.85 * current;
-        }
-        if (age === 33) {
-            return 0.8 * current;
-        }
-        if (age > 33) {
-            return 0.7 * current;
-        }
     }
 
     // ps: player stats objects, regular season only, most recent first
