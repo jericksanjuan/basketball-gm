@@ -359,9 +359,10 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         });
     }
 
-    function allRostersAutoSort() {
-        var tx = dao.tx("players", "readwrite");
+    function allRostersAutoSort(tx) {
+        var tx = dao.tx(["players"], "readwrite", tx);
         return Promise.all(_.range(30), function(tid) {
+                    console.log('sorting roster for', tid);
                     return rosterAutoSort(tx, tid);
                 });
     }

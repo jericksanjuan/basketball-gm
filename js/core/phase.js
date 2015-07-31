@@ -42,9 +42,9 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
     }
 
     function newPhasePreseason(tx) {
-        return team.allRostersAutoSort().then(function () { // Important: do this before changing the season or contracts and stats are fucked up
-            return require("core/league").setGameAttributes(tx, {season: g.season + 1});
-        }).then(function () {
+         // Important: do this before changing the season or contracts and stats are fucked up
+        return require("core/league").setGameAttributes(tx, {season: g.season + 1})
+            .then(function () {
             var coachingRanks, scoutingRank;
 
             coachingRanks = [];
@@ -88,6 +88,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         });
                     }
                 });
+            }).then(function() {
+                return team.allRostersAutoSort(tx);
             }).then(function () {
                 if (g.autoPlaySeasons > 0) {
                     return require("core/league").setGameAttributes(tx, {autoPlaySeasons: g.autoPlaySeasons - 1});
