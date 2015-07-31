@@ -218,7 +218,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                             });
                             salarySpace = Math.max(0, salarySpace - zContract.amount);
                             // Only offer min contracts when salarySpace is low.
-                            if (salarySpace < g.minContract && rosterSpace > 1) {
+                            if (salarySpace < g.minContract && t.fa.salarySpace <= g.minContract && rosterSpace > 1) {
                                 salarySpace = Math.max(g.minContract, salarySpace);
                             }
                             rosterSpace -= 1;
