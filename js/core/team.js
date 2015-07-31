@@ -362,7 +362,6 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
     function allRostersAutoSort(tx) {
         var tx = dao.tx(["players"], "readwrite", tx);
         return Promise.map(_.range(30), function(tid) {
-                    console.log('sorting roster for', tid);
                     return rosterAutoSort(tx, tid);
                 });
     }
@@ -1443,7 +1442,7 @@ console.log(dv);*/
             // List of free agents looking for minimum contracts, sorted by value. This is used to bump teams up to the minimum roster size.
             minFreeAgents = [];
             for (i = 0; i < players.length; i++) {
-                if (players[i].contract.amount === 500) {
+                if (players[i].contract.amount === g.minContract) {
                     minFreeAgents.push(players[i]);
                 }
             }

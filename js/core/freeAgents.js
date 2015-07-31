@@ -445,6 +445,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             team.fa.compositeRating = teamComposite(t.player, 7);
             // team.fa.synergy
             team.fa.rosterSpace = Math.max(0, 15 - t.player.length);
+            //TODO: get contracts of released players.
             team.fa.salarySpace = Math.max(0, g.salaryCap - sumContracts(t.player));
             team.fa.salarySpace = Math.max(team.fa.salarySpace, g.minContract);
             team.fa.minSigningScore = 2.0;
