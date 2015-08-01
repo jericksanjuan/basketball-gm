@@ -106,15 +106,24 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         return _.difference(needsCopy, diff).slice(0, fcount);
     }
 
+    /**
+     * For team t, make offers to free agent players that passes their criterias
+     * @param  {object} t         team object
+     * @param  {Object} players   player object
+     * @param  {Boolean} toRelease special case if true, team will look for players
+     *                             that they are willing to sign over their roster limit.
+     * @return {Array}           of offer objects
+     */
     function makeOffer(t, players, toRelease) {
         toRelease = toRelease || false;
         return Promise.try(function () {
-            var baseScore, fp, i, needs, offerCond, offers, playerGrade, pp, ppmin,
+            var baseScore, fp, ftmp, i, needs, offerCond, offers, playerGrade, pp, ppmin,
                 rosterSpace, salarySpace, zContract, zVal;
             offers = [];
             ppmin = [];
             fp = helpers.deepCopy(players);
 
+            // identify team needs. If 15 days left in free agency, loosen requirements.
             needs = teamNeeds(t.fa.compositeRating);
             if (g.daysLeft <= 15 && t.fa.rosterSpace > 0) {
                 needs = needs;
@@ -171,9 +180,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     });
                 }
 
-                var ftmp = function(p) {return [p.pid, p.name, p.signingScore, p.contract.amount];}
-                var tmp = pp.map(ftmp);
-                console.log('offers considered', g.teamAbbrevsCache[t.tid], JSON.stringify(tmp));
+                ftmp = function(p) {return [p.pid, p.name, p.signingScore, p.contract.amount];}
+                console.log('offers considered', g.teamAbbrevsCache[t.tid], JSON.stringify(pp.map(ftmp)));
 
                 for (i = 0; i < pp.length; i++)  {
                     // console.log(pp[i].value, pp[i].name, g.teamAbbrevsCache[t.tid], pp[i].signingScore, baseScore);

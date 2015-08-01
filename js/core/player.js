@@ -1641,15 +1641,29 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         return adjustValue(age, pot, current);
     }
 
+    /**
+     * Generate a contract for the cpu that uses their own fuzz value.
+     * @param  {Object} p    player object
+     * @param  {number} fuzz value for a team
+     * @return {Object}      contract
+     */
     function cpuGenContract(p, fuzz) {
-        var contract, mp;
+        var contract, contractOrig, mp;
         mp = {};
         mp.value = cpuValue(p, fuzz);
         mp.born = p.born;
         mp.ratings = p.ratings;
         contract = genContract(mp);
-        contract.amount = Math.ceil((contract.amount + 2 * p.contract.amount) / 3);
-        contract.exp = contract.exp + 1;
+
+        contractOrig = genContract(p);
+        // if player has reduced his contract demand, follow it.
+        if (p.contract.amount < contractOrig.amount) {
+            contract.amount = p.contract.amount;
+            contract.exp = p.contract.exp;
+        } else {
+            contract.amount = Math.ceil((contract.amount + 2 * p.contract.amount) / 3);
+            contract.exp = contract.exp + 1;
+        }
         return contract;
     }
 
