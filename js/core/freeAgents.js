@@ -43,12 +43,13 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         if (forSigning) {
             return [age, potential, skill];
         }
-        return (age + 1.5 * composite + potential + 0.5 * roster + 2 * skill) / 6;
-        // if(grade > 0.6) {
+        grade = (age + 1.5 * composite + potential + 0.5 * roster + 2 * skill) / 6;
+        // if(grade > 0.6 || true) {
         //     console.log('age:', age, 'composite:', composite,
         //         'potential:', potential, 'roster:', roster, 'skill:', skill,
         //         'grade', grade, 'name:', p.name, p.value, zAge);
         // }
+        return grade;
     }
 
     function signingScore(p, t, needs) {
@@ -971,6 +972,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         readyTeamsFA: readyTeamsFA,
         readyPlayersFA: readyPlayersFA,
         tickFreeAgencyDay: tickFreeAgencyDay,
-        cpuResignPlayers: cpuResignPlayers
+        cpuResignPlayers: cpuResignPlayers,
+        gradePlayer: gradePlayer
     };
 });

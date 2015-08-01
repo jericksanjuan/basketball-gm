@@ -1365,7 +1365,50 @@ console.log(dv);*/
      * @return {Promise.?string} Resolves to null if there is no error, or a string with the error message otherwise.
      */
     function checkRosterSizes() {
-        var checkRosterSize, minFreeAgents, tx, userTeamSizeError;
+        var checkRosterSize, minFreeAgents, tx, userTeamSizeError,
+            cutValue, fa, getContractWorth, cutValueSort;
+
+        fa = require('core/freeAgents');
+
+        /**
+         * Get actual worth of player contract (amount * remaining years) for
+         * vets and rookies. First rounders are worth more than 2nd rounders ($0).
+         * @param  {Object} p object that represents a player.
+         * @return {number}   p
+         */
+        getContractWorth = function(p) {
+            var clen, draftFactor;
+            p.justDrafted = p.tid === p.draft.tid &&
+                p.draft.year === g.season && g.phase >= g.PHASE.DRAFT ||
+                p.draft.year === g.season - 1 && g.phase < g.PHASE.REGULAR_SEASON;
+
+            if (g.phase >= g.PHASE.DRAFT) {
+                clen = p.contract.exp - g.season;
+            } else {
+                clen = p.contract.exp - g.season + 1;
+            }
+
+            draftFactor = (p.justDrafted) ? (p.draft.round === 1) ? 0.5 : 0 : 1;
+
+            return p.contract.amount * clen * draftFactor;
+
+        }
+
+        /**
+         * Returns combine grade and contract remaining value. The cutValue
+         * property is added to the player object.
+         * @param  {[type]} p object that represents a player.
+         */
+        cutValue = function(p) {
+            var grade, contractWorth;
+            grade = fa.gradePlayer(p);
+            contractWorth = getContractWorth(p) / 4000;
+            p.cutValue = (grade * 1.4 + contractWorth) / 2.4;
+        };
+
+        cutValueSort = function(a, b) {
+            return a.cutValue - b.cutValue;
+        }
 
         checkRosterSize = function (tid) {
             return dao.players.getAll({ot: tx, index: "tid", key: tid}).then(function (players) {
@@ -1382,10 +1425,11 @@ console.log(dv);*/
                         userTeamSizeError += 'more than the maximum number of players (15). You must remove players (by <a href="' + helpers.leagueUrl(["roster"]) + '">releasing them from your roster</a> or through <a href="' + helpers.leagueUrl(["trade"]) + '">trades</a>) before continuing.';
                     } else {
                         // Automatically drop lowest value players until we reach 15
-                        players.sort(function (a, b) { return a.value - b.value; }); // Lowest first
+                        players.map(cutValue);
+                        players.sort(cutValueSort);
                         promises = [];
                         for (i = 0; i < (numPlayersOnRoster - 15); i++) {
-                            promises.push(player.release(tx, players[i], false));
+                            promises.push(player.release(tx, players[i], p.justDrafted));
                         }
                         return Promise.all(promises);
                     }
