@@ -587,6 +587,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                 oBaseMoods = baseMoods;
                 return freeAgents.cpuResignPlayers(tx, baseMoods);
             }).then(function() {
+                return team.allRostersAutoSort(tx);
+            }).then(function() {
                 return freeAgents.readyTeamsFA(tx);
             }). then(function() {
                 return freeAgents.readyPlayersFA(tx, oBaseMoods);

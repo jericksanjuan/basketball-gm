@@ -457,7 +457,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             //TODO: get contracts of released players.
             team.fa.salarySpace = Math.max(0, g.salaryCap - sumContracts(t.player));
             team.fa.salarySpace = Math.max(team.fa.salarySpace, g.minContract);
-            team.fa.minSigningScore = 2.0;
+            team.fa.minSigningScore = 2.0; //  (TODO: set this to signingScore of 7th, 8th or 9th player)
 
             // ensure fuzzValue exist.
             team.fuzzValue = team.fuzzValue || player.genFuzz(t.scoutingRank);
@@ -510,7 +510,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 index: "tid",
                 key: IDBKeyRange.bound(g.PLAYER.UNDRAFTED, g.PLAYER.FREE_AGENT),
                 callback: function (p) {
+                    // TODO: confirm if not used.
                     p.compositeRating = playerComposite(p.ratings);
+                    // TODO: faGrade not being used
                     p.faGrade = gradePlayer(p);
                     return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
                 }
@@ -532,7 +534,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
         updatePlayer = function (p) {
             var resigned = false;
-            // console.log((p.tid === -1) ? 'FA' : p.tid, p.name, p.contract.amount, p.contract.exp);
+
             if (p.tid !== -1) {
                 resigned = true;
                 eventResigned(p);
@@ -540,10 +542,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             dao.players.put({
                 ot: tx,
                 value: p
-            }).then(function() {
-                if (resigned) {
-                    return team.rosterAutoSort(tx, p.tid);
-                }
             });
         };
 
@@ -551,7 +549,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             eventLog.add(null, {
                 type: "reSigned",
                 text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> re-signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
-                showNotification: false,
+                showNotification: p.tid === g.userTid,
                 pids: [p.pid],
                 tids: [p.tid]
             });
@@ -561,7 +559,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             eventLog.add(null, {
                 type: "released",
                 text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tid], g.season]) + '">' + g.teamNamesCache[tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> to free agency.',
-                showNotification: false,
+                showNotification: p.tid === g.userTid,
                 pids: [p.pid],
                 tids: [tid]
             });
@@ -648,6 +646,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                             }
                         } else {
                             console.log(p.name, 'refuses to sign with', g.teamAbbrevsCache[i],  offerGrade);
+                            eventReleased(p, offer.tid);
                         }
 
                     }
