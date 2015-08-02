@@ -265,7 +265,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             pid: p.pid
         });
 
-        teamUpdate = function (tid, amount, skill, skillValue, signingScore) {
+        teamUpdate = function (tid, amount) {
             return dao.teams.get({
                     ot: tx,
                     key: tid
@@ -276,9 +276,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     t.fa.salarySpace = Math.max(t.fa.salarySpace, g.minContract);
                     t.fa.rosterSpace -= 1;
                     t.fa.rosterSpace = Math.max(0, t.fa.rosterSpace);
-                    t.fa.minSigningScore = Math.min(t.fa.minSigningScore, signingScore);
-                    // t.fa.compositeRating[skill] += skillValue;
-                    // t.fa.compositeRating[skill] /= 2;
                     return dao.teams.put({
                             ot: tx,
                             value: t
@@ -304,7 +301,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 pids: [p.pid],
                 tids: [p.tid]
             });
-            return teamUpdate(offer.tid, offer.amount, offer.skill, p.compositeRating[offer.skill], offer.signingScore)
+            return teamUpdate(offer.tid, offer.amount)
                 .then(function () {
                     return dao.players.put({
                             ot: tx,
@@ -423,14 +420,14 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
      * Ready all teams for free agency.
      */
     function readyTeamsFA(tx) {
-        var game, i, promises, readyTeam, teamComposite;
+        var game, i, promises, readyTeam, teamComposite, teamMinSigningScore;
         game = require('core/game');
         tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
         promises = [];
 
         teamComposite = function (players, numOfPlayers) {
             var i, k, tc;
-            numOfPlayers = (numOfPlayers > players.length) ? players.length - 1 : numOfPlayers;
+            numOfPlayers = (numOfPlayers > players.length) ? players.length : numOfPlayers;
             tc = {};
             for (k in g.compositeWeights) {
                 if (g.compositeWeights.hasOwnProperty(k)) {
@@ -447,9 +444,31 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             return tc;
         };
 
+        teamMinSigningScore = function(players, team, numOfPlayers) {
+            var i, needs, p, score, scoreFinal, starters, total, weight;
+            starters = Math.min(5, numOfPlayers);
+            needs = teamNeeds(team.fa.compositeRating);
+
+            weight = 1;
+            total = 0;
+            for (i = 0; i < numOfPlayers; i++) {
+                p = players[i].object;
+                p.compositeRating = playerComposite(p.ratings);
+                score = signingScore(p, team, needs);
+                total = total + score * weight;
+                if (i > starters) {
+                    weight = 0.5;
+                }
+            }
+            scoreFinal = total / (starters + (numOfPlayers - starters) * 0.5);
+            return scoreFinal;
+        }
+
         readyTeam = function (t) {
-            var team = t.team;
+            var rotCutoff = 7,
+                team = t.team;
             team.fa = {};
+            rotCutoff = Math.min(rotCutoff, t.player.length);
 
             team.fa.compositeRating = teamComposite(t.player, 7);
             // team.fa.synergy
@@ -457,7 +476,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             //TODO: get contracts of released players.
             team.fa.salarySpace = Math.max(0, g.salaryCap - sumContracts(t.player));
             team.fa.salarySpace = Math.max(team.fa.salarySpace, g.minContract);
-            team.fa.minSigningScore = 2.0; //  (TODO: set this to signingScore of 7th, 8th or 9th player)
+
+            team.fa.minSigningScore = teamMinSigningScore(t.player, team, rotCutoff);
+            console.log(team.tid, 'minSigningScore', team.fa.minSigningScore);
 
             // ensure fuzzValue exist.
             team.fuzzValue = team.fuzzValue || player.genFuzz(t.scoutingRank);

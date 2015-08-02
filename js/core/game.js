@@ -542,6 +542,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
 
                 if (forFA) {
                     p.contract = players[i].contract;
+                    p.object = players[i];
                 }
 
                 t.player.push(p);

@@ -1429,7 +1429,7 @@ console.log(dv);*/
                         players.sort(cutValueSort);
                         promises = [];
                         for (i = 0; i < (numPlayersOnRoster - 15); i++) {
-                            promises.push(player.release(tx, players[i], p.justDrafted));
+                            promises.push(player.release(tx, players[i], players[i].justDrafted));
                         }
                         return Promise.all(promises);
                     }
