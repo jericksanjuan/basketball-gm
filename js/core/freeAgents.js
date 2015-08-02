@@ -53,11 +53,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
     }
 
     function signingScore(p, t, needs) {
-        var composite, gp;
+        var composite, gp, pcomposite;
         gp = gradePlayer(p, true);
+        // players released after start of FA do not have compositeRating.
+        pcomposite = p.compositeRating || playerComposite(p.ratings);
         composite = compareComposites(p.compositeRating, t.fa.compositeRating, needs);
         p.signingScore = (0.5 * gp[0] + 2 * composite + 1.5 * gp[1] + gp[2]) / 5.0;
-        // console.log(p.name, gp[0], composite, gp[1], gp[2]);
         return p.signingScore;
     }
 
@@ -553,10 +554,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 index: "tid",
                 key: IDBKeyRange.bound(g.PLAYER.UNDRAFTED, g.PLAYER.FREE_AGENT),
                 callback: function (p) {
-                    // TODO: confirm if not used.
                     p.compositeRating = playerComposite(p.ratings);
-                    // TODO: faGrade not being used
-                    p.faGrade = gradePlayer(p);
                     return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
                 }
             });
