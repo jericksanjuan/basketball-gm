@@ -57,7 +57,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         gp = gradePlayer(p, true);
         // players released after start of FA do not have compositeRating.
         pcomposite = p.compositeRating || playerComposite(p.ratings);
-        composite = compareComposites(p.compositeRating, t.fa.compositeRating, needs);
+        composite = compareComposites(pcomposite, t.fa.compositeRating, needs);
         p.signingScore = (0.5 * gp[0] + 2 * composite + 1.5 * gp[1] + gp[2]) / 5.0;
         return p.signingScore;
     }
@@ -117,6 +117,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
      */
     function makeOffer(t, players, toRelease) {
         toRelease = toRelease || false;
+        // If it's the regular season, only make offer when signingScore is
+        // above the team's minSigningScore.
+        toRelease = (g.phase < g.PHASE.FREE_AGENCY) ? true : toRelease;
         return Promise.try(function () {
             var baseScore, fp, ftmp, i, needs, offerCond, offers, playerGrade, pp, ppmin,
                 rosterSpace, salarySpace, zContract, zVal;
@@ -222,10 +225,11 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                                 tid: t.tid,
                                 pid: pp[i].pid,
                                 amount: zContract.amount,
-                                exp: (zVal < 1) ? g.season + 1 : zContract.exp,
+                                exp: (zVal < 1) ? (g.phase === g.PHASE.REGULAR_SEASON) ? g.season : g.season + 1 : zContract.exp,
                                 skill: needs,
                                 signingScore: pp[i].signingScore
                             });
+
                             salarySpace = Math.max(0, salarySpace - zContract.amount);
                             // Only offer min contracts when salarySpace is low.
                             if (salarySpace < g.minContract && t.fa.salarySpace <= g.minContract && rosterSpace > 1) {
@@ -309,7 +313,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                             value: p
                         })
                         .then(function() {
-                            return team.rosterAutoSort(tx, offer.tid);
+                            if (g.phase >= g.PHASE.PRESEASON || g.phase <= g.PHASE.REGULAR_SEASON) {
+                                return team.rosterAutoSort(tx, offer.tid);
+                            }
                         });
                 });
         };
@@ -403,12 +409,34 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     .then(function (offers) {
                         offers = _.flatten(offers);
                         offers = _.sortBy(offers, 'pid');
+                        // Skip signing during regular season if no offers are
+                        // being made.
+                        if (g.phase < g.PHASE.FREE_AGENCY && offers.length === 0) {
+                            localStorage.signingSkip = random.randInt(7, 11);
+                        }
                         return Promise.each(players, function (p) {
                             return decideContract(tx, p, offers, maxSalarySpace);
                         });
                     });
             }
         );
+    }
+
+    /**
+     * Skip cpu signing of free agents during regular season.
+     * @return {null|Promise} Do nothing or do tickFreeAgencyDay
+     */
+    function tickRegSeasonFreeAgency() {
+        if (localStorage.signingSkip === undefined) {
+            localStorage.signingSkip = 0;
+        }
+
+        if (localStorage.signingSkip > 0) {
+            localStorage.signingSkip--;
+            return;
+        }
+
+        return tickFreeAgencyDay();
     }
 
     function sumContracts(players) {
@@ -1025,6 +1053,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         readyTeamsFA: readyTeamsFA,
         readyPlayersFA: readyPlayersFA,
         tickFreeAgencyDay: tickFreeAgencyDay,
+        tickRegSeasonFreeAgency: tickRegSeasonFreeAgency,
         cpuResignPlayers: cpuResignPlayers,
         gradePlayer: gradePlayer
     };

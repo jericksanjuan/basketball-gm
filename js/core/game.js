@@ -845,8 +845,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                             // Check if it's the playoffs and do some special stuff if it is or isn't
                             return Promise.try(function () {
                                 if (g.phase !== g.PHASE.PLAYOFFS) {
-                                    // Decrease free agent demands and let AI teams sign them
-                                    return freeAgents.decreaseDemands().then(freeAgents.autoSign);
+                                    // Do regular season cpu free agent signing.
+                                    return freeAgents.tickRegSeasonFreeAgency();
                                 }
                             }).then(cbPlayGames);
                         });

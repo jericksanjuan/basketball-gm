@@ -161,6 +161,9 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                 });*/
             }
         }).then(function() {
+            // random start of reg. season cpu free agent signings
+            localStorage.signingSkip = random.randInt(0,7);
+            // reset team's FA signing criteria
             return freeAgents.readyTeamsFA(tx);
         }).then(function () {
             return [undefined, ["playerMovement"]];
