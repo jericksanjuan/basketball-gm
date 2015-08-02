@@ -93,7 +93,10 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                     return require("core/league").setGameAttributes(tx, {autoPlaySeasons: g.autoPlaySeasons - 1});
                 }
             }).then(function() {
-                return team.allRostersAutoSort(tx);
+                return Promise.join(
+                        team.allRostersAutoSort(tx),
+                        freeAgents.readyPlayersFA(tx)
+                    )
             }).then(function () {
                 if (g.enableLogging && !window.inCordova) {
                     ads.show();
@@ -157,6 +160,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                     }
                 });*/
             }
+        }).then(function() {
+            return freeAgents.readyTeamsFA(tx);
         }).then(function () {
             return [undefined, ["playerMovement"]];
         });
@@ -659,11 +664,11 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                     require("core/league").updateLastDbChange();
 
                     if (phase === g.PHASE.PRESEASON) {
-                        phaseChangeTx = dao.tx(["gameAttributes", "players", "playerStats", "releasedPlayers", "teams"], "readwrite");
+                        phaseChangeTx = dao.tx(["gameAttributes", "players", "playerStats", "releasedPlayers", "teams", "negotiations", "messages"], "readwrite");
                         return newPhasePreseason(phaseChangeTx);
                     }
                     if (phase === g.PHASE.REGULAR_SEASON) {
-                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "schedule", "teams"], "readwrite");
+                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "schedule", "teams", "players", "releasedPlayers"], "readwrite");
                         return newPhaseRegularSeason(phaseChangeTx);
                     }
                     if (phase === g.PHASE.AFTER_TRADE_DEADLINE) {
@@ -690,7 +695,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         return newPhaseResignPlayers(phaseChangeTx);
                     }
                     if (phase === g.PHASE.FREE_AGENCY) {
-                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "teams"], "readwrite");
+                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "teams", "releasedPlayers"], "readwrite");
                         return newPhaseFreeAgency(phaseChangeTx);
                     }
                     if (phase === g.PHASE.FANTASY_DRAFT) {

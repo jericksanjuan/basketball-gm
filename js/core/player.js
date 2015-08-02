@@ -579,17 +579,19 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         p = setContract(p, genContract(p), false);
 
         // Set initial player mood towards each team
-        p.freeAgentMood = _.map(baseMoods, function (mood) {
-            if (pr.ovr + pr.pot < 80) {
-                // Bad players don't have the luxury to be choosy about teams
-                return 0;
-            }
-            if (phase === g.PHASE.RESIGN_PLAYERS) {
-                // More likely to re-sign your own players
-                return helpers.bound(mood + random.uniform(-1, 0.5), 0, 1000);
-            }
-            return helpers.bound(mood + random.uniform(-1, 1.5), 0, 1000);
-        });
+        if (baseMoods) {
+            p.freeAgentMood = _.map(baseMoods, function (mood) {
+                if (pr.ovr + pr.pot < 80) {
+                    // Bad players don't have the luxury to be choosy about teams
+                    return 0;
+                }
+                if (phase === g.PHASE.RESIGN_PLAYERS) {
+                    // More likely to re-sign your own players
+                    return helpers.bound(mood + random.uniform(-1, 0.5), 0, 1000);
+                }
+                return helpers.bound(mood + random.uniform(-1, 1.5), 0, 1000);
+            });
+        }
 
         // During regular season, or before season starts, allow contracts for
         // just this year.

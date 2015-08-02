@@ -545,14 +545,19 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
      * Save composite rating.
      */
     function readyPlayersFA(tx, baseMoods) {
-        var readyPlayer;
+        var key, readyPlayer;
         tx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "releasedPlayers", "teams"], "readwrite", tx);
+        if (g.phase === g.PHASE.FREE_AGENCY) {
+            key = g.PLAYER.FREE_AGENT;
+        } else {
+            key = IDBKeyRange.bound(g.PLAYER.UNDRAFTED, g.PLAYER.FREE_AGENT);
+        }
 
         readyPlayer = function () {
             return dao.players.iterate({
                 ot: tx,
                 index: "tid",
-                key: IDBKeyRange.bound(g.PLAYER.UNDRAFTED, g.PLAYER.FREE_AGENT),
+                key: key,
                 callback: function (p) {
                     p.compositeRating = playerComposite(p.ratings);
                     return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
