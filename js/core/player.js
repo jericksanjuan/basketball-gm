@@ -545,7 +545,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
                     baseMoods[i] += 0.1 * (1 - teams[i].seasons[s].pop / 10);
 
                     // Randomness
-                    baseMoods[i] += random.uniform(-0.2, 0.2);
+                    // baseMoods[i] += random.uniform(-0.2, 0.2);
 
                     baseMoods[i] = helpers.bound(baseMoods[i], 0, 1);
                 }
