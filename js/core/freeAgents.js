@@ -180,7 +180,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     });
                 }
 
-                ftmp = function(p) {return [p.pid, p.name, p.signingScore, p.contract.amount];}
+                ftmp = function(p) {return [p.pid, p.name, p.signingScore, p.contract.amount];};
                 console.log('offers considered', g.teamAbbrevsCache[t.tid], JSON.stringify(pp.map(ftmp)));
 
                 for (i = 0; i < pp.length; i++)  {
@@ -420,7 +420,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
      * Ready all teams for free agency.
      */
     function readyTeamsFA(tx) {
-        var game, i, promises, readyTeam, teamComposite, teamMinSigningScore;
+        var game, getReleasedSalaries, i, promises, readyTeam, teamComposite, teamMinSigningScore;
         game = require('core/game');
         tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
         promises = [];
@@ -462,21 +462,19 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             }
             scoreFinal = total / (starters + (numOfPlayers - starters) * 0.5);
             return scoreFinal;
-        }
+        };
 
-        readyTeam = function (t) {
+        readyTeam = function (t, releasedSalaries) {
             var rotCutoff = 7,
                 team = t.team;
             team.fa = {};
             rotCutoff = Math.min(rotCutoff, t.player.length);
 
             team.fa.compositeRating = teamComposite(t.player, 7);
-            // team.fa.synergy
             team.fa.rosterSpace = Math.max(0, 15 - t.player.length);
-            //TODO: get contracts of released players.
-            team.fa.salarySpace = Math.max(0, g.salaryCap - sumContracts(t.player));
+            team.fa.salarySpace = Math.max(0,
+                g.salaryCap - sumContracts(t.player) - releasedSalaries[team.tid]);
             team.fa.salarySpace = Math.max(team.fa.salarySpace, g.minContract);
-
             team.fa.minSigningScore = teamMinSigningScore(t.player, team, rotCutoff);
             console.log(team.tid, 'minSigningScore', team.fa.minSigningScore);
 
@@ -485,22 +483,46 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             return team;
         };
 
+        getReleasedSalaries = function() {
+            return dao.releasedPlayers.getAll({
+                ot: tx, index: "tid"
+            })
+            .then(function(players) {
+                var salaries = 0,
+                    getReleasedSalary = function(tid) {
+                        var tp = players.filter(function(p) {
+                            return p.tid === tid;
+                        });
+                        if (tp.length > 0) {
+                            return sumContracts(tp);
+                        }
+                        return 0;
+                    };
+                salaries = _.map(_.range(30), getReleasedSalary);
+                return salaries;
+            });
+        };
+
         for (i = 0; i < g.numTeams; i++) {
             promises.push(game.loadTeam(i, tx, true));
         }
 
-        return Promise.all(promises)
-            .then(function (teams) {
-                _.each(teams, function (t) {
-                    var team = readyTeam(t);
-                    dao.teams.put({
-                        ot: tx,
-                        value: team
-                    }).then(function () {
-                        return;
-                    });
-                });
-            });
+        return Promise.join(
+                Promise.all(promises),
+                getReleasedSalaries(),
+                function (teams, releasedSalaries) {
+                    var readySave = function(t) {
+                        var team = readyTeam(t, releasedSalaries);
+                        dao.teams.put({
+                            ot: tx,
+                            value: team
+                        }).then(function () {
+                            return;
+                        });
+                    }
+                    return Promise.map(teams, readySave);
+                }
+            );
     }
 
     function playerComposite(ratings) {
