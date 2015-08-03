@@ -121,7 +121,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         // above the team's minSigningScore.
         toRelease = (g.phase < g.PHASE.FREE_AGENCY) ? true : toRelease;
         return Promise.try(function () {
-            var baseScore, fp, ftmp, i, needs, offerCond, offers, playerGrade, pp, ppmin,
+            var baseScore, baseScoreLimit, fp, ftmp, i, needs, offerCond, offers, playerGrade, pp, ppmin,
                 rosterSpace, salarySpace, zContract, zVal;
             offers = [];
             ppmin = [];
@@ -175,7 +175,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
                 baseScore =  0.45 + zVal * 0.35;
                 if (rosterSpace > 1 && pp[0].signingScore < baseScore) {
-                    baseScore = pp[rosterSpace - 2].signingScore;
+                    if (rosterSpace > pp.length) {
+                        baseScoreLimit = pp.length - 1;
+                    } else {
+                        baseScoreLimit = rosterSpace - 2;
+                    }
+                    baseScore = pp[baseScoreLimit].signingScore;
                 }
 
                 if (!toRelease) {
@@ -755,7 +760,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 index: "tid",
                 key: IDBKeyRange.lowerBound(0)
             }),
-            getReleasedSalaries(tx, true);
+            getReleasedSalaries(tx, true),
             resignPlayers
         );
     }

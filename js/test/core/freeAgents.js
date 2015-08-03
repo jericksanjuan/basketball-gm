@@ -2,7 +2,7 @@
  * @name test.core.draft
  * @namespace Tests for core.draft.
  */
-define(["dao", "db", "globals", "core/league", "core/freeAgents", 'lib/underscore'], function (dao, db, g, league, fa, _) {
+define(["dao", "db", "globals", "core/league", "core/freeAgents", 'lib/underscore', "core/game"], function (dao, db, g, league, fa, _, game) {
     "use strict";
 
     describe("core/freeAgents", function () {
@@ -15,7 +15,7 @@ define(["dao", "db", "globals", "core/league", "core/freeAgents", 'lib/underscor
 
         before(function() {
             var tx = dao.tx(['gameAttributes'], 'readwrite', tx);
-            return require("core/league").setGameAttributes(tx, {daysLeft: 30});
+            return require("core/league").setGameAttributes(tx, {daysLeft: 30, phase: g.PHASE.FREE_AGENCY});
         });
         after(function () {
             return league.remove(g.lid);
