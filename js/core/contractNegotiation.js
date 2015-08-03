@@ -2,8 +2,32 @@
  * @name core.contractNegotiation
  * @namespace All aspects of contract negotiation.
  */
-define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "lib/bluebird", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, freeAgents, player, team, Promise, eventLog, helpers, lock, random) {
+define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "lib/bluebird", "util/eventLog", "util/helpers", "util/lock", "util/random", "core/game"], function (dao, g, ui, freeAgents, player, team, Promise, eventLog, helpers, lock, random, game) {
     "use strict";
+
+    function negotiationToOffer(nego) {
+        var offer = {
+            tid: nego.tid,
+            pid: nego.pid,
+            amount: nego.team.amount,
+            exp: g.season + nego.team.years,
+            skill: [],
+            signingScore: 0.6
+        }
+        return offer;
+    }
+
+    function getAllUserOffers(tx) {
+        tx = dao.tx(["negotiations"], "readwrite", tx);
+        return dao.negotiations.getAll({
+            ot: tx
+        })
+        .then(function(userNego) {
+            var offers = userNego.map(negotiationToOffer);
+            console.log(userNego);
+            return _.sortBy(offers, "pid");
+        });
+    }
 
     /**
      * Start a new contract negotiation with a player.
@@ -28,6 +52,13 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 return "You cannot initiate a new negotiaion while game simulation is in progress or a previous contract negotiation is in process.";
             }
 
+            // FA Signing:
+            // Get total amount of existing offers/negotiations
+            // Also consider roster space.
+            // Raise error if any of the two fails
+            //
+            // Resigning:
+            // Create negotiation/offer.
             return dao.players.count({
                 ot: tx,
                 index: "tid",
@@ -124,6 +155,9 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
 
         tx = dao.tx(["negotiations", "players"], "readwrite");
 
+        // Just save offer if not resigning. Player will decide
+        // along with other contracts.
+
         dao.players.get({ot: tx, key: pid}).then(function (p) {
             var mood;
 
@@ -132,6 +166,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             if (p.freeAgentMood[g.userTid] > 1) {
                 p.freeAgentMood[g.userTid] = 1;
             }
+            // Increase mood depending on how less the offer grade from
+            // passing the cut off.
 
             dao.players.put({ot: tx, value: p});
 
@@ -351,6 +387,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
         cancel: cancel,
         cancelAll: cancelAll,
         create: create,
-        offer: offer
+        offer: offer,
+        getAllUserOffers: getAllUserOffers
     };
 });

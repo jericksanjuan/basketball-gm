@@ -34,6 +34,21 @@ define(["dao", "db", "globals", "core/contractNegotiation", "core/league"], func
                     });
                 });
             });
+            it("should convert negotiations to offers", function() {
+                var tx;
+                tx = dao.tx(["gameAttributes", "messages", "negotiations", "players"], "readwrite");
+                return Promise.all([
+                        contractNegotiation.create(tx, 9, true),
+                        contractNegotiation.create(tx, 7, true),
+                        contractNegotiation.create(tx, 8, true)
+                    ])
+                    .then(function(error) {
+                        return contractNegotiation.getAllUserOffers();
+                    })
+                    .then(function(offers) {
+                        console.log(offers);
+                    })
+            });
             it("should fail to start a negotiation with anyone but a free agent", function () {
                 var tx;
 
