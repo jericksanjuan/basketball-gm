@@ -294,7 +294,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 });
         };
 
-        acceptContract = function (offer) {
+        acceptContract = function (offer, otherTeams) {
+            var userOffered = (g.autoPlaySeasons === 0 && otherTeams.indexOf(g.userTid) > -1);
+            // ^ use to show notification if user offered to player that was signed by another team.
             p.tid = offer.tid;
             p.contract.amount = offer.amount;
             p.contract.exp = offer.exp;
@@ -304,14 +306,22 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             p = player.setContract(p, p.contract, true);
             p.gamesUntilTradable = 15;
 
+            // TODO: show notification to user if offered player is signed by
+            // other team.
             eventLog.add(null, {
                 type: "freeAgent",
                 text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
-                showNotification: p.tid === g.userTid,
+                showNotification: p.tid === g.userTid || userOffered,
                 pids: [p.pid],
                 tids: [p.tid]
             });
             return teamUpdate(offer.tid, offer.amount)
+                .then(function() {
+                    // Delete user offers
+                    if (userOffered) {
+                        return dao.negotiations.delete({ot: tx, key: p.pid});
+                    }
+                })
                 .then(function () {
                     return dao.players.put({
                             ot: tx,
@@ -339,7 +349,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         goContract = Math.random() > 0.95 - +desiredMet * 0.3 - (1 - g.daysLeft / 30);
         if (goContract && offers.length > 0) {
             console.log('accepted', p.value, p.name, g.teamAbbrevsCache[offers[0].tid], offers[0].amount, offers[0].grade, offers);
-            return acceptContract(offers[0]);
+            return acceptContract(offers[0], _.pluck(offers, 'tid'));
         }
 
         if (p.contract.amount > maxSalarySpace) {
@@ -357,8 +367,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
     }
 
     function tickFreeAgencyDay(tx) {
+        var contractNegotiation = require('core/contractNegotiation');
         console.log(g.daysLeft, 'of Free Agency');
-        tx = dao.tx(["players", "releasedPlayers", "teams", "playerStats"], "readwrite", tx);
+        tx = dao.tx(["players", "releasedPlayers", "teams", "playerStats", "negotiations"], "readwrite", tx);
 
         return Promise.join(
             dao.teams.getAll({
@@ -369,7 +380,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 index: "tid",
                 key: g.PLAYER.FREE_AGENT
             }),
-            function (teams, players) {
+            contractNegotiation.getAllUserOffers(tx),
+            function (teams, players, userOffers) {
                 var i, maxSalarySpace, offers, rosterSpaceTotal;
                 offers = [];
                 teams.sort(function (a, b) {
@@ -413,6 +425,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 return Promise.all(offers)
                     .then(function (offers) {
                         offers = _.flatten(offers);
+                        // add user offers
+                        offers = offers.concat(userOffers);
                         offers = _.sortBy(offers, 'pid');
                         // Skip signing during regular season if no offers are
                         // being made.
