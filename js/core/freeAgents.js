@@ -446,10 +446,45 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
     }
 
     /**
+     * Get total of all released salaries for the teams.
+     * @param  {IDBTransaction} tx          indexedDB transaction
+     * @param  {Boolean} notExpiring If true, return total of non expiring deals only.
+     * @return {Array.number}             Total of released salaries per team.
+     */
+    function getReleasedSalaries(tx, notExpiring) {
+        var salFilter;
+        notExpiring = notExpiring || false;
+        if (notExpiring) {
+            salFilter = function(p) {
+                return p.tid === this.tid && p.contract.exp > g.season;
+            };
+        } else  {
+            salFilter = function(p) {
+                return p.tid === this.tid;
+            };
+        }
+        return dao.releasedPlayers.getAll({
+            ot: tx, index: "tid"
+        })
+        .then(function(players) {
+            var salaries = 0,
+                getReleasedSalary = function(tid) {
+                    var tp = players.filter(salFilter, {tid: tid});
+                    if (tp.length > 0) {
+                        return sumContracts(tp);
+                    }
+                    return 0;
+                };
+            salaries = _.map(_.range(30), getReleasedSalary);
+            return salaries;
+        });
+    };
+
+    /**
      * Ready all teams for free agency.
      */
     function readyTeamsFA(tx) {
-        var game, getReleasedSalaries, i, promises, readyTeam, teamComposite, teamMinSigningScore;
+        var game, i, promises, readyTeam, teamComposite, teamMinSigningScore;
         game = require('core/game');
         tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
         promises = [];
@@ -512,33 +547,13 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             return team;
         };
 
-        getReleasedSalaries = function() {
-            return dao.releasedPlayers.getAll({
-                ot: tx, index: "tid"
-            })
-            .then(function(players) {
-                var salaries = 0,
-                    getReleasedSalary = function(tid) {
-                        var tp = players.filter(function(p) {
-                            return p.tid === tid;
-                        });
-                        if (tp.length > 0) {
-                            return sumContracts(tp);
-                        }
-                        return 0;
-                    };
-                salaries = _.map(_.range(30), getReleasedSalary);
-                return salaries;
-            });
-        };
-
         for (i = 0; i < g.numTeams; i++) {
             promises.push(game.loadTeam(i, tx, true));
         }
 
         return Promise.join(
                 Promise.all(promises),
-                getReleasedSalaries(),
+                getReleasedSalaries(tx),
                 function (teams, releasedSalaries) {
                     var readySave = function(t) {
                         var team = readyTeam(t, releasedSalaries);
@@ -657,7 +672,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 if (cash > 0) {
                     signPlayer(p, offer);
                 }
-                if (grade > 9.0) {
+                if (grade > 0.9) {
                     signPlayer(p, offer);
                 }
                 if (p.tid === offer.tid) {
@@ -672,7 +687,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             }
         };
 
-        resignPlayers = function (teams, players) {
+        resignPlayers = function (teams, players, releasedSalaries) {
             var cash, fuzzValues, i, salarySpace, strategies, toUpdate, tp, tpCopy;
 
             toUpdate = [];
@@ -697,7 +712,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     return p.contract.exp === g.season;
                 });
                 tpCopy = _.difference(tpCopy, tp);
-                salarySpace = g.salaryCap - sumContracts(tpCopy);
+                salarySpace = g.salaryCap - sumContracts(tpCopy) - releasedSalaries[i];
                 _.each(tp, function (p) {
                     var grade, offer, offerGrade, zContract;
                     grade = gradePlayer(p);
@@ -740,6 +755,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 index: "tid",
                 key: IDBKeyRange.lowerBound(0)
             }),
+            getReleasedSalaries(tx, true);
             resignPlayers
         );
     }
