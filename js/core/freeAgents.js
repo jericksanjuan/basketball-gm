@@ -2,7 +2,7 @@
  * @name core.freeAgents
  * @namespace Functions related to free agents that didn't make sense to put anywhere else.
  */
-define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random"], function (dao, g, ui, player, team, Promise, _, eventLog, helpers, lock, random) {
+define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/lock", "util/random", "lib/bbgm-notifications"], function (dao, g, ui, player, team, Promise, _, eventLog, helpers, lock, random, bbgmNotifications) {
     "use strict";
 
     var CPU_RESIGN_CUTOFF = 0.6;
@@ -262,10 +262,10 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         var amount, exp, mood, yr, yrOff;
         yrOff = offer.exp - g.season;
         yr = p.contract.exp - g.season;
-        amount = offer.amount / p.contract.amount;
+        amount = offer.amount / (p.contract.amount * 0.5) - 1;
         exp = (yr - Math.abs(yr - yrOff)) / yr;
         mood = 1 - p.freeAgentMood[offer.tid] / 2.5;
-        offer.grade = (1.25 * amount + 3 * exp + mood) / 5.25;
+        offer.grade = (2.5 * amount + 3 * exp + mood) / 6.5;
         return offer.grade;
     }
 
@@ -276,6 +276,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             })
             .then(function (t) {
                 console.log('accepted', g.teamAbbrevsCache[t.tid], t.fa.salarySpace, amount, t.fa.salarySpace - amount, t.fa.rosterSpace);
+                if (!t.hasOwnProperty('fa')) {
+                    t.fa = {
+                        salarySpace: 0,
+                        rosterSpace: 0
+                    }
+                }
                 t.fa.salarySpace = Math.max(0, t.fa.salarySpace - amount);
                 t.fa.salarySpace = Math.max(t.fa.salarySpace, g.minContract);
                 t.fa.rosterSpace -= 1;
@@ -289,7 +295,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
     };
 
     function acceptContract(p, offer, otherTeams, tx, eventType) {
-        var userOffered = (g.autoPlaySeasons === 0 && otherTeams.indexOf(g.userTid) > -1);
+        var text,
+            userOffered = (g.autoPlaySeasons === 0 && otherTeams.indexOf(g.userTid) > -1);
         tx = dao.tx(["teams", "players"], "readwrite", tx)
         eventType = eventType || 'freeAgent';
         // ^ use to show notification if user offered to player that was signed by another team.
@@ -305,10 +312,15 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         eventLog.add(null, {
             type: eventType,
             text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
-            showNotification: p.tid === g.userTid || userOffered,
+            showNotification: p.tid === g.userTid,
             pids: [p.pid],
             tids: [p.tid]
         });
+
+        if (userOffered && p.tid !== g.userTid) {
+            text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> has chosen to sign with the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> instead of your team.'
+            bbgmNotifications.notify(text, 'Free Agency', true);
+        }
         return teamUpdate(offer.tid, offer.amount, tx)
             .then(function() {
                 return dao.negotiations.delete({ot: tx, key: p.pid});
@@ -346,8 +358,10 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
         goContract = Math.random() > 0.95 - +desiredMet * 0.3 - (1 - g.daysLeft / 30);
         if (goContract && offers.length > 0) {
-            console.log('accepted', p.value, p.name, g.teamAbbrevsCache[offers[0].tid], offers[0].amount, offers[0].grade, offers);
-            return acceptContract(p, offers[0], _.pluck(offers, 'tid'), tx);
+            if (offers[0].grade > 0.5) {
+                console.log('accepted', p.value, p.name, g.teamAbbrevsCache[offers[0].tid], offers[0].amount, offers[0].grade, offers);
+                return acceptContract(p, offers[0], _.pluck(offers, 'tid'), tx);
+            }
         }
 
         if (p.contract.amount > maxSalarySpace) {
@@ -423,14 +437,15 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 return Promise.all(offers)
                     .then(function (offers) {
                         offers = _.flatten(offers);
-                        // add user offers
-                        offers = offers.concat(userOffers);
-                        offers = _.sortBy(offers, 'pid');
                         // Skip signing during regular season if no offers are
                         // being made.
                         if (g.phase < g.PHASE.FREE_AGENCY && offers.length === 0) {
                             localStorage.signingSkip = random.randInt(7, 11);
                         }
+                        // add user offers
+                        offers = offers.concat(userOffers);
+                        offers = _.sortBy(offers, 'pid');
+
                         return Promise.each(players, function (p) {
                             return decideContract(tx, p, offers, maxSalarySpace);
                         });

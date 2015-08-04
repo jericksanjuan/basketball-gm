@@ -101,7 +101,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
             // Adjust to account for in-season signings
             if (g.phase <= g.PHASE.AFTER_TRADE_DEADLINE) {
                 negotiation.player.expiration -= 1;
-                negotation.team.expiration -= 1;
+                negotiation.team.expiration -= 1;
             }
 
             // Can't flatten more because of the return errorMessage above

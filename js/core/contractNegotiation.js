@@ -96,8 +96,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                         if (offers[j].grade > random.uniform(0.88, 0.92)) {
                             return freeAgents.acceptContract(p, offers[j], [], tx, 'reSigned');
                         } else {
-                            text = '<a' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign with ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a>.'
-                            bbgmNotifications.notify(text, 'Free Agency', false);
+                            text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign with ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a>.'
+                            bbgmNotifications.notify(text, 'Free Agency', true);
                         }
                     }
                 });
