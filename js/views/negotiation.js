@@ -138,7 +138,11 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
                 p.gradep = ((p.grade)/100) * 100;
                 p.age = g.season - p.born.year;
                 p.yearsPro = g.season - p.draft.year;
-                p.lastSalary = _.last(p.salaries).amount;
+                if (p.salaries.length > 0) {
+                    p.lastSalary = _.last(p.salaries).amount;
+                } else {
+                    p.lastSalary = 0;
+                }
                 delete p.freeAgentMood;
 
                 return Promise.join(

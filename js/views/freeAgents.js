@@ -60,7 +60,6 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 capSpace = 0;
             }
             numRosterSpots = g.maxRosterSize - userPlayers.length;
-            negoRosterSpots = numRosterSpots - allNego.objects.length;
 
             players = player.filter(players, {
                 attrs: ["pid", "name", "age", "contract", "freeAgentMood", "injury", "watch"],
@@ -85,6 +84,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             negotiationsOffered = _.groupBy(negotiationsOffered, "pid")
 
             negoSpace = Math.max(capSpace - allNego.amount / 1000, 0.5);
+            negoRosterSpots = numRosterSpots - negotiationsPids.length;
 
             for (i = 0; i < players.length; i++) {
                 players[i].mood = player.moodColorText(players[i]);
@@ -101,7 +101,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 negoSpace: negoSpace,
                 numRosterSpots: numRosterSpots,
                 negoRosterSpots: negoRosterSpots,
-                negoLen: negotiations.length,
+                negoLen: negotiationsPids.length,
                 negoAmount: allNego.amount / 1000,
                 players: players
             };
