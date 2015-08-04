@@ -36,8 +36,10 @@
     <h2 data-bind="text: team.region() + ' ' + team.name()"></h2>
     <p>
       Current Payroll: <span data-bind="currency: [payroll, 'M']"></span><br>
+      Projected Payroll: <span data-bind="currency: [projectedPayroll, 'M']"></span><br/>
       Salary Cap: <span data-bind="currency: [salaryCap, 'M']"></span><br>
-      Free Space: <span data-bind="currency: [negoSpace, 'M']"></span>
+      Free Space: <span data-bind="currency: [negoSpace, 'M']"></span> <span data-bind="visible: negoSpace() <= 0.5">(min.contract only)</span><br/>
+      <span data-bind="visible: negotiation.resigning()">* No limit when resigning own player.</span>
     </p>
     <h3>Your Proposal</h3>
     <form data-bind="attrLeagueUrl: {action: ['negotiation', player.pid]}" method="POST">

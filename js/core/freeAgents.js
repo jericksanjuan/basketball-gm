@@ -318,7 +318,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         });
 
         if (userOffered && p.tid !== g.userTid) {
-            text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> has chosen to sign with the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> instead of your team.'
+            text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> has decided to sign with the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamRegionsCache[p.tid] + " " +g.teamNamesCache[p.tid] + '</a> instead of your team.'
             bbgmNotifications.notify(text, 'Free Agency', true);
         }
         return teamUpdate(offer.tid, offer.amount, tx)

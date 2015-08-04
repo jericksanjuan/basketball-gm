@@ -73,17 +73,15 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
         });
     }
 
-    function decidePlayerResignOffers(tx) {
-        if (g.phase !== g.PHASE.RESIGN_PLAYERS) {
-            return;
-        }
+    function decidePlayerResignOffers(tx, notResign) {
+        notResign = notResign || false;
+
         tx = dao.tx(["negotiations", "players", "releasedPlayers", "teams"], "readwrite", tx);
         return getAllUserOffers(tx)
             .then(function(offers) {
                 var i, j, keys, offers, perPlayer, text;
                 perPlayer = _.groupBy(offers, 'pid')
                 keys = _.keys(perPlayer);
-                console.log(keys, perPlayer)
                 return Promise.map(keys, function(pid) {
                     return dao.players.get({ot: tx, key: +pid})
                 })
@@ -92,9 +90,13 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                     for (j = 0; j < offers.length; j++ ) {
                         // slightly random passing grade
                         if (offers[j].grade > random.uniform(0.88, 0.92)) {
-                            return freeAgents.acceptContract(p, offers[j], [], tx, 'reSigned');
+                            return freeAgents.acceptContract(p, offers[j], [], tx, (notResign) ? 'freeAgent' : 'reSigned');
                         } else {
-                            text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign with ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[offers[j].tid], g.season]) + '">' + g.teamNamesCache[offers[j].tid] + '</a>.'
+                            if (notResign) {
+                                text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign contract with your team, ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[offers[j].tid], g.season]) + '">' + g.teamNamesCache[offers[j].tid] + '</a>.'
+                            } else {
+                                text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign contract to remain on your team, ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[offers[j].tid], g.season]) + '">' + g.teamNamesCache[offers[j].tid] + '</a>.'
+                            }
                             bbgmNotifications.notify(text, 'Free Agency', true);
                         }
                     }
@@ -232,11 +234,13 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                             rosterSize,
                             salarySpace;
 
+                        allNego.objects = _.filter(allNego.objects, function(n) {
+                            return n.team.amount > 0 && n.team.years > 0 && n.pid != pid;
+                        })
                         rosterSize = numOfReleased.false + allNego.objects.length;
 
                         // Exclude current negotiation if it already exist.
                         if (nego) {
-                            rosterSize -= 1;
                             allNego.amount -= nego.team.amount;
                         }
                         salarySpace = Math.max(g.salaryCap - result[0], 0);

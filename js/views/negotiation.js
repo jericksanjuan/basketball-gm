@@ -152,6 +152,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
                         return {
                             salaryCap: g.salaryCap / 1000,
                             payroll: payroll / 1000,
+                            projectedPayroll: (payroll + allNego.amount) / 1000,
                             negoSpace: Math.max((g.salaryCap - payroll - allNego.amount) / 1000, 0.5),
                             team: {region: g.teamRegionsCache[g.userTid], name: g.teamNamesCache[g.userTid]},
                             player: p,
