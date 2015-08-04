@@ -21,24 +21,6 @@ define(["dao", "globals"], function (dao, g) {
     }
 
     /**
-     * Is a negotiation in progress?
-     *
-     * Calls the callback function with either true or false depending on whether there is an ongoing negoation.
-     *
-     * @memberOf util.lock
-     * @param {IDBObjectStore|IDBTransaction|null} ot An IndexedDB object store or transaction on negotiations; if null is passed, then a new transaction will be used.
-     * @return {Promise.boolean}
-     */
-    function negotiationInProgress(ot) {
-        return dao.negotiations.getAll({ot: ot}).then(function (negotiations) {
-            if (negotiations.length > 0) {
-                return true;
-            }
-            return false;
-        });
-    }
-
-    /**
      * Is a phase change in progress?
      *
      * @memberOf util.lock
@@ -66,18 +48,12 @@ define(["dao", "globals"], function (dao, g) {
                 return false;
             }
 
-            return negotiationInProgress(ot).then(function (negotiationInProgressBool) {
-                if (negotiationInProgressBool) {
+            return phaseChangeInProgress(ot).then(function (phaseChangeInProgressBool) {
+                if (phaseChangeInProgressBool) {
                     return false;
                 }
 
-                return phaseChangeInProgress(ot).then(function (phaseChangeInProgressBool) {
-                    if (phaseChangeInProgressBool) {
-                        return false;
-                    }
-
-                    return true;
-                });
+                return true;
             });
         });
     }
@@ -97,20 +73,7 @@ define(["dao", "globals"], function (dao, g) {
                 return false;
             }
 
-            // Allow multiple parallel negotiations only for re-signing players
-            return dao.negotiations.getAll({ot: ot}).then(function (negotiations) {
-                var i;
-
-                for (i = 0; i < negotiations.length; i++) {
-                    if (!negotiations[i].resigning) {
-                        return false;
-                    }
-                }
-
-                return true;
-
-                // Don't also check phase change because negotiations are auto-started in phase change
-            });
+            return true;
         });
     }
 
@@ -139,7 +102,6 @@ define(["dao", "globals"], function (dao, g) {
 
     return {
         gamesInProgress: gamesInProgress,
-        negotiationInProgress: negotiationInProgress,
         phaseChangeInProgress: phaseChangeInProgress,
         canStartGames: canStartGames,
         canStartNegotiation: canStartNegotiation,

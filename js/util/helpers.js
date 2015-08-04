@@ -1,4 +1,4 @@
-/**
+    /**
  * @name util.helpers
  * @namespace Various utility functions that don't have anywhere else to go.
  */
@@ -1190,6 +1190,27 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
 
     function correctLinkLid(event) {
         event.text = event.text.replace(/\/l\/\d+\//g, '/l/' + g.lid + '/');
+
+    /**
+     * Toggle mute and unmute console output
+     * @param  {Boolean} toMute If true no output
+     */
+    function muteConsole(toMute) {
+        var methods = ["log", "debug", "info"],
+            methodsTmp = ["logTmp", "debugTmp", "infoTmp"];
+
+        if(!window.console) window.console = {};
+        if (toMute) {
+            for(var i=0;i<methods.length;i++){
+                console[methodsTmp[i]] = console[methods[i]];
+                console[methods[i]] = function(){};
+            }
+        } else {
+            for(var i=0;i<methods.length;i++){
+                console[methods[i]] = console[methodsTmp[i]];
+                console[methodsTmp[i]] = function(){};
+            }
+        }
     }
 
     return {
@@ -1228,6 +1249,7 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
         plusMinus: plusMinus,
         seriesHomeAway: seriesHomeAway,
         multiSort: multiSort,
-        correctLinkLid: correctLinkLid
+        correctLinkLid: correctLinkLid,
+        muteConsole: muteConsole
     };
 });

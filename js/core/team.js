@@ -371,6 +371,13 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         });
     }
 
+    function allRostersAutoSort(tx) {
+        var tx = dao.tx(["players"], "readwrite", tx);
+        return Promise.map(_.range(30), function(tid) {
+                    return rosterAutoSort(tx, tid);
+                });
+    }
+
     /**
      * Gets all the contracts a team owes.
      *
@@ -976,7 +983,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                     key: pidsAdd[i]
                 }).then(function (p) {
                     add.push({
-                        value: p.valueWithContract,
+                        value: p.value,
                         skills: _.last(p.ratings).skills,
                         contract: p.contract,
                         worth: player.genContract(p, false, false, true),
@@ -1441,7 +1448,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                 var dWon, s, won;
 
                 // Skip user's team
-                if (t.tid === g.userTid) {
+                if (t.tid === g.userTid && g.autoPlaySeasons === 0) {
                     return;
                 }
 
@@ -1462,7 +1469,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                     statsSeasons: [g.season],
                     statsTid: t.tid
                 }).then(function (players) {
-                    var age, denominator, i, numerator, score, updated, youngStar;
+                    var age, denominator, i, numerator, score, scoutingRank, updated, youngStar;
 
                     players = player.filter(players, {
                         season: g.season,
@@ -1499,6 +1506,12 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                         updated = true;
                     }
 
+
+                    scoutingRank = t.seasons[s].expenses.scouting.rank;
+                    // assign fuzz value for this season
+                    t.fuzzValue = player.genFuzz(scoutingRank);
+                    updated = true;
+
                     if (updated) {
                         return t;
                     }
@@ -1519,7 +1532,50 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
      * @return {Promise.?string} Resolves to null if there is no error, or a string with the error message otherwise.
      */
     function checkRosterSizes() {
-        var checkRosterSize, minFreeAgents, tx, userTeamSizeError;
+        var checkRosterSize, minFreeAgents, tx, userTeamSizeError,
+            cutValue, fa, getContractWorth, cutValueSort;
+
+        fa = require('core/freeAgents');
+
+        /**
+         * Get actual worth of player contract (amount * remaining years) for
+         * vets and rookies. First rounders are worth more than 2nd rounders ($0).
+         * @param  {Object} p object that represents a player.
+         * @return {number}   p
+         */
+        getContractWorth = function(p) {
+            var clen, draftFactor;
+            p.justDrafted = p.tid === p.draft.tid &&
+                p.draft.year === g.season && g.phase >= g.PHASE.DRAFT ||
+                p.draft.year === g.season - 1 && g.phase < g.PHASE.REGULAR_SEASON;
+
+            if (g.phase >= g.PHASE.DRAFT) {
+                clen = p.contract.exp - g.season;
+            } else {
+                clen = p.contract.exp - g.season + 1;
+            }
+
+            draftFactor = (p.justDrafted) ? (p.draft.round === 1) ? 0.5 : 0 : 1;
+
+            return p.contract.amount * clen * draftFactor;
+
+        }
+
+        /**
+         * Returns combine grade and contract remaining value. The cutValue
+         * property is added to the player object.
+         * @param  {[type]} p object that represents a player.
+         */
+        cutValue = function(p) {
+            var grade, contractWorth;
+            grade = fa.gradePlayer(p);
+            contractWorth = getContractWorth(p) / 4000;
+            p.cutValue = (grade * 1.4 + contractWorth) / 2.4;
+        };
+
+        cutValueSort = function(a, b) {
+            return a.cutValue - b.cutValue;
+        }
 
         checkRosterSize = function (tid) {
             return dao.players.getAll({
@@ -1540,12 +1596,12 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                         userTeamSizeError += 'more than the maximum number of players (15). You must remove players (by <a href="' + helpers.leagueUrl(["roster"]) + '">releasing them from your roster</a> or through <a href="' + helpers.leagueUrl(["trade"]) + '">trades</a>) before continuing.';
                     } else {
                         // Automatically drop lowest value players until we reach 15
-                        players.sort(function (a, b) {
-                            return a.value - b.value;
-                        }); // Lowest first
+
+                        players.map(cutValue);
+                        players.sort(cutValueSort);
                         promises = [];
                         for (i = 0; i < (numPlayersOnRoster - 15); i++) {
-                            promises.push(player.release(tx, players[i], false));
+                            promises.push(player.release(tx, players[i], players[i].justDrafted));
                         }
                         return Promise.all(promises);
                     }
@@ -1609,7 +1665,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
             // List of free agents looking for minimum contracts, sorted by value. This is used to bump teams up to the minimum roster size.
             minFreeAgents = [];
             for (i = 0; i < players.length; i++) {
-                if (players[i].contract.amount === 500) {
+                if (players[i].contract.amount === g.minContract) {
                     minFreeAgents.push(players[i]);
                 }
             }
@@ -1642,6 +1698,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         updateStrategies: updateStrategies,
         checkRosterSizes: checkRosterSizes,
         getPayroll: getPayroll,
-        getPayrolls: getPayrolls
+        getPayrolls: getPayrolls,
+        allRostersAutoSort: allRostersAutoSort
     };
 });

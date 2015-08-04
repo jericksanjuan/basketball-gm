@@ -488,9 +488,8 @@ define(["dao", "globals", "templates", "lib/bluebird", "lib/davis", "lib/html2ca
         return Promise.all([
             lock.unreadMessage(ot),
             lock.gamesInProgress(ot),
-            lock.negotiationInProgress(ot),
             lock.phaseChangeInProgress(ot)
-        ]).spread(function (unreadMessage, gamesInProgress, negotiationInProgress, phaseChangeInProgress) {
+        ]).spread(function (unreadMessage, gamesInProgress, phaseChangeInProgress) {
             var i, ids, j, someOptions;
 
             if (unreadMessage) {
@@ -499,9 +498,7 @@ define(["dao", "globals", "templates", "lib/bluebird", "lib/davis", "lib/html2ca
             if (gamesInProgress) {
                 keys = ["play-menu-stop"];
             }
-            if (negotiationInProgress && g.phase !== g.PHASE.RESIGN_PLAYERS) {
-                keys = ["play-menu-contract-negotiation"];
-            }
+
             if (phaseChangeInProgress) {
                 keys = ["play-menu-abort-phase-change"];
             }

@@ -42,9 +42,9 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
     }
 
     function newPhasePreseason(tx) {
-        return freeAgents.autoSign(tx).then(function () { // Important: do this before changing the season or contracts and stats are fucked up
-            return require("core/league").setGameAttributes(tx, {season: g.season + 1});
-        }).then(function () {
+         // Important: do this before changing the season or contracts and stats are fucked up
+        return require("core/league").setGameAttributes(tx, {season: g.season + 1})
+            .then(function () {
             var coachingRanks, scoutingRank;
 
             coachingRanks = [];
@@ -92,10 +92,16 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                 if (g.autoPlaySeasons > 0) {
                     return require("core/league").setGameAttributes(tx, {autoPlaySeasons: g.autoPlaySeasons - 1});
                 }
+            }).then(function() {
+                return Promise.join(
+                        team.allRostersAutoSort(tx),
+                        freeAgents.readyPlayersFA(tx)
+                    )
             }).then(function () {
                 if (g.enableLogging && !window.inCordova) {
                     ads.show();
                 }
+                team.checkRosterSizes();
 
                 return [undefined, ["playerMovement"]];
             });
@@ -154,6 +160,11 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                     }
                 });*/
             }
+        }).then(function() {
+            // random start of reg. season cpu free agent signings
+            localStorage.signingSkip = random.randInt(0,7);
+            // reset team's FA signing criteria
+            return freeAgents.readyTeamsFA(tx);
         }).then(function () {
             return [undefined, ["playerMovement"]];
         });
@@ -425,15 +436,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         // Add to free agents first, to generate a contract demand
                         return player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods).then(function () {
                             // Open negotiations with player
-                            return contractNegotiation.create(tx, p.pid, true, tid).then(function (error) {
-                                if (error !== undefined && error) {
-                                    eventLog.add(null, {
-                                        type: "refuseToSign",
-                                        text: error,
-                                        pids: [p.pid],
-                                        tids: [tid]
-                                    });
-                                }
+                            return contractNegotiation.create(tx, p.pid, true, tid).then(function() {
+                                return;
                             });
                         });
                     }
@@ -448,98 +452,23 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
     }
 
     function newPhaseFreeAgency(tx) {
-        var strategies;
-
-        return team.filter({
-            ot: tx,
-            attrs: ["strategy"],
-            season: g.season
-        }).then(function (teams) {
-            strategies = _.pluck(teams, "strategy");
-
-            // Delete all current negotiations to resign players
-            return contractNegotiation.cancelAll(tx);
-        }).then(function () {
-            return player.genBaseMoods(tx).then(function (baseMoods) {
-                // Reset contract demands of current free agents and undrafted players
-                return dao.players.iterate({
-                    ot: tx,
-                    index: "tid",
-                    key: IDBKeyRange.bound(g.PLAYER.UNDRAFTED, g.PLAYER.FREE_AGENT), // This only works because g.PLAYER.UNDRAFTED is -2 and g.PLAYER.FREE_AGENT is -1
-                    callback: function (p) {
-                        return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
-                    }
-                }).then(function () {
-                    // AI teams re-sign players or they become free agents
-                    // Run this after upding contracts for current free agents, or addToFreeAgents will be called twice for these guys
-                    return dao.players.iterate({
-                        ot: tx,
-                        index: "tid",
-                        key: IDBKeyRange.lowerBound(0),
-                        callback: function (p) {
-                            var contract, factor;
-
-                            if (p.contract.exp <= g.season && (g.userTids.indexOf(p.tid) < 0 || g.autoPlaySeasons > 0)) {
-                                // Automatically negotiate with teams
-                                if (strategies[p.tid] === "rebuilding") {
-                                    factor = 0.4;
-                                } else {
-                                    factor = 0;
-                                }
-
-                                if (Math.random() < p.value / 100 - factor) { // Should eventually be smarter than a coin flip
-                                    // See also core.team
-                                    contract = player.genContract(p);
-                                    contract.exp += 1; // Otherwise contracts could expire this season
-                                    p = player.setContract(p, contract, true);
-                                    p.gamesUntilTradable = 15;
-
-                                    eventLog.add(null, {
-                                        type: "reSigned",
-                                        text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> re-signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
-                                        showNotification: false,
-                                        pids: [p.pid],
-                                        tids: [p.tid]
-                                    });
-
-                                    return p; // Other endpoints include calls to addToFreeAgents, which handles updating the database
-                                }
-
-                                return player.addToFreeAgents(tx, p, g.PHASE.RESIGN_PLAYERS, baseMoods);
-                            }
-                        }
-                    });
-                });
-            }).then(function () {
-                // Bump up future draft classes (nested so tid updates don't cause race conditions)
-                return dao.players.iterate({
-                    ot: tx,
-                    index: "tid",
-                    key: g.PLAYER.UNDRAFTED_2,
-                    callback: function (p) {
-                        p.tid = g.PLAYER.UNDRAFTED;
-                        p.ratings[0].fuzz /= 2;
-                        return p;
-                    }
-                }).then(function () {
-                    return dao.players.iterate({
-                        ot: tx,
-                        index: "tid",
-                        key: g.PLAYER.UNDRAFTED_3,
-                        callback: function (p) {
-                            p.tid = g.PLAYER.UNDRAFTED_2;
-                            p.ratings[0].fuzz /= 2;
-                            return p;
-                        }
-                    });
-                });
-            }).then(function () {
-                // Create new draft class for 3 years in the future
-                return draft.genPlayers(tx, g.PLAYER.UNDRAFTED_3);
-            }).then(function () {
+        var oBaseMoods;
+        return player.genBaseMoods(tx)
+            .then(function(baseMoods) {
+                oBaseMoods = baseMoods;
+                return freeAgents.cpuResignPlayers(tx, baseMoods);
+            }).then(function() {
+                return contractNegotiation.decidePlayerResignOffers(tx);
+            }).then(function() {
+                return team.allRostersAutoSort(tx);
+            }).then(function() {
+                return freeAgents.readyTeamsFA(tx);
+            }). then(function() {
+                return freeAgents.readyPlayersFA(tx, oBaseMoods);
+            }).then(draft.tickDraftClasses(tx)
+            ).then(function () {
                 return [helpers.leagueUrl(["free_agents"]), ["playerMovement"]];
             });
-        });
     }
 
     function newPhaseFantasyDraft(tx, position) {
@@ -603,11 +532,11 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                     require("core/league").updateLastDbChange();
 
                     if (phase === g.PHASE.PRESEASON) {
-                        phaseChangeTx = dao.tx(["gameAttributes", "players", "playerStats", "releasedPlayers", "teams"], "readwrite");
+                        phaseChangeTx = dao.tx(["gameAttributes", "players", "playerStats", "releasedPlayers", "teams", "negotiations", "messages"], "readwrite");
                         return newPhasePreseason(phaseChangeTx);
                     }
                     if (phase === g.PHASE.REGULAR_SEASON) {
-                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "schedule", "teams"], "readwrite");
+                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "schedule", "teams", "players", "releasedPlayers"], "readwrite");
                         return newPhaseRegularSeason(phaseChangeTx);
                     }
                     if (phase === g.PHASE.AFTER_TRADE_DEADLINE) {
@@ -634,7 +563,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         return newPhaseResignPlayers(phaseChangeTx);
                     }
                     if (phase === g.PHASE.FREE_AGENCY) {
-                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "teams"], "readwrite");
+                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "teams", "releasedPlayers"], "readwrite");
                         return newPhaseFreeAgency(phaseChangeTx);
                     }
                     if (phase === g.PHASE.FANTASY_DRAFT) {

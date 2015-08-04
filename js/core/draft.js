@@ -655,6 +655,38 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
         });
     }
 
+    function tickDraftClasses(tx) {
+        // Bump up future draft classes (nested so tid updates don't cause race conditions)
+        return function() {
+            return dao.players.iterate({
+                ot: tx,
+                index: "tid",
+                key: g.PLAYER.UNDRAFTED_2,
+                callback: function (p) {
+                    p.tid = g.PLAYER.UNDRAFTED;
+                    p.ratings[0].fuzz /= 2;
+                    return p;
+                }
+            })
+            .then(function () {
+                return dao.players.iterate({
+                    ot: tx,
+                    index: "tid",
+                    key: g.PLAYER.UNDRAFTED_3,
+                    callback: function (p) {
+                        p.tid = g.PLAYER.UNDRAFTED_2;
+                        p.ratings[0].fuzz /= 2;
+                        return p;
+                    }
+                });
+            })
+            .then(function () {
+                // Create new draft class for 3 years in the future
+                return genPlayers(tx, g.PLAYER.UNDRAFTED_3);
+            });
+        };
+    }
+
     return {
         getOrder: getOrder,
         setOrder: setOrder,
@@ -665,6 +697,7 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
         getRookieSalaries: getRookieSalaries,
         selectPlayer: selectPlayer,
         updateChances: updateChances,
-        lotterySort: lotterySort
+        lotterySort: lotterySort,
+        tickDraftClasses: tickDraftClasses
     };
 });
