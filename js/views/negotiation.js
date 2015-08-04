@@ -73,7 +73,10 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
             if (teamAmountNew !== teamAmountNew || teamYearsNew !== teamYearsNew) {
                 ui.realtimeUpdate([], helpers.leagueUrl(["negotiation", pid]));
             } else {
-                contractNegotiation.offer(pid, teamAmountNew, teamYearsNew).then(function () {
+                contractNegotiation.offer(pid, teamAmountNew, teamYearsNew).then(function (error) {
+                    if (error !== undefined && error ) {
+                        helpers.errorNotify(error);
+                    }
                     ui.realtimeUpdate([], helpers.leagueUrl(["negotiation", pid]));
                 });
             }
@@ -94,9 +97,11 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
             negotiation = negotiations[0];
 
             negotiation.player.expiration = negotiation.player.years + g.season;
+            negotiation.team.expiration = negotiation.team.years + g.season;
             // Adjust to account for in-season signings
             if (g.phase <= g.PHASE.AFTER_TRADE_DEADLINE) {
                 negotiation.player.expiration -= 1;
+                negotation.team.expiration -= 1;
             }
 
             // Can't flatten more because of the return errorMessage above
@@ -130,6 +135,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
                 } else {
                     p.mood = '<span class="text-danger"><b>Insulted by your presence.</b></span>';
                 }
+                p.grade = negotiation.grade * 100;
+                p.gradep = ((p.grade - 80)/20) * 100;
                 delete p.freeAgentMood;
 
                 return team.getPayroll(null, g.userTid).get(0).then(function (payroll) {
@@ -140,8 +147,9 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
                         player: p,
                         negotiation: {
                             team: {
-                                amount: negotiation.team.amount / 1000,
-                                years: negotiation.team.years
+                                amount: ((negotiation.team.amount) ? negotiation.team.amount : negotiation.player.amount) / 1000,
+                                years: (negotiation.team.years) ? negotiation.team.years : negotiation.player.years,
+                                expiration: (negotiation.team.expiration) ? negotiation.team.expiration : negotiation.player.expiration
                             },
                             player: {
                                 amount: negotiation.player.amount / 1000,

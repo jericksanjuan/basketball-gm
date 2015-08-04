@@ -263,9 +263,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         yrOff = offer.exp - g.season;
         yr = p.contract.exp - g.season;
         amount = offer.amount / p.contract.amount;
-        exp = (yr - Math.abs(yrOff - yr)) / yr;
+        exp = (yr - Math.abs(yr - yrOff)) / yr;
         mood = 1 - p.freeAgentMood[offer.tid] / 2.5;
-        offer.grade = (2 * amount + 0.5 * exp + mood) / 3.5;
+        offer.grade = (1.25 * amount + 3 * exp + mood) / 5.25;
         return offer.grade;
     }
 
@@ -1090,6 +1090,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         tickFreeAgencyDay: tickFreeAgencyDay,
         tickRegSeasonFreeAgency: tickRegSeasonFreeAgency,
         cpuResignPlayers: cpuResignPlayers,
-        gradePlayer: gradePlayer
+        gradePlayer: gradePlayer,
+        gradeOffer: gradeOffer
     };
 });

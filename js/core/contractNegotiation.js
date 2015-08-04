@@ -5,6 +5,11 @@
 define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "lib/bluebird", "util/eventLog", "util/helpers", "util/lock", "util/random", "core/game"], function (dao, g, ui, freeAgents, player, team, Promise, eventLog, helpers, lock, random, game) {
     "use strict";
 
+    /**
+     * Convert a negotiation object to a contract offer object.
+     * @param  {Object} nego negotiation object
+     * @return {Object}      contract offer object
+     */
     function negotiationToOffer(nego) {
         var offer = {
             tid: nego.tid,
@@ -17,15 +22,53 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
         return offer;
     }
 
+    /**
+     * Convenience function to get all current negotiations as contract offer objects.
+     * @param  {IDBTransaction|null} tx An IndexedDB transaction
+     * @return {Array.Object}    list of contract offer objects.
+     */
     function getAllUserOffers(tx) {
         tx = dao.tx(["negotiations"], "readwrite", tx);
         return dao.negotiations.getAll({
             ot: tx
         })
         .then(function(userNego) {
-            var offers = userNego.map(negotiationToOffer);
+            var offers;
+            // Exclude newly created negotiations (not offered)
+            userNego = userNego.filter(function(n) {
+                return n.team.years > 0;
+            });
+            offers = userNego.map(negotiationToOffer);
             console.log(userNego);
             return _.sortBy(offers, "pid");
+        });
+    }
+
+    /**
+     * Get total amount of all negotiations made.
+     * @param  {IDBTransaction|null} tx  An IndexedDB transaction
+     * @param  {number|null} tid team id, filter by tid if given.
+     * @return {Object}     Object containing total amount and Array of all negotiations.
+     */
+    function getAllNegoWithAmount(tx, tid) {
+        tid = (tid === undefined) ? -1 : tid;
+        tx = dao.tx(["negotiations"], "readwrite", tx);
+        return dao.negotiations.getAll({
+            ot: tx
+        })
+        .then(function(allNego) {
+            var totalAmount;
+            if (tid > -1) {
+                allNego = _.where(allNego, {tid: tid});
+            }
+
+            totalAmount = _.reduce(allNego, function(a, b) {
+                return a + b.team.amount;
+            }, 0);
+            return {
+                objects: allNego,
+                amount: totalAmount
+            }
         });
     }
 
@@ -52,13 +95,6 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 return "You cannot initiate a new negotiaion while game simulation is in progress or a previous contract negotiation is in process.";
             }
 
-            // FA Signing:
-            // Get total amount of existing offers/negotiations
-            // Also consider roster space.
-            // Raise error if any of the two fails
-            //
-            // Resigning:
-            // Create negotiation/offer.
             return dao.players.count({
                 ot: tx,
                 index: "tid",
@@ -76,21 +112,17 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                     }
 
                     // Initial player proposal;
-                    playerAmount = freeAgents.amountWithMood(p.contract.amount, p.freeAgentMood[g.userTid]);
+                    playerAmount = p.contract.amount;
                     playerYears = p.contract.exp - g.season;
                     // Adjust to account for in-season signings;
                     if (g.phase <= g.PHASE.AFTER_TRADE_DEADLINE) {
                         playerYears += 1;
                     }
 
-                    if (freeAgents.refuseToNegotiate(playerAmount, p.freeAgentMood[g.userTid])) {
-                        return '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign with you, no matter what you offer.';
-                    }
-
                     negotiation = {
                         pid: pid,
                         tid: tid,
-                        team: {amount: playerAmount, years: playerYears},
+                        team: {amount: 0, years: 0},
                         player: {amount: playerAmount, years: playerYears},
                         orig: {amount: playerAmount, years: playerYears},
                         resigning: resigning
@@ -148,107 +180,85 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
      * @return {Promise}
      */
     function offer(pid, teamAmount, teamYears) {
-        var tx;
+        var isResigning, tx;
 
         teamAmount = validAmount(teamAmount);
         teamYears = validYears(teamYears);
 
-        tx = dao.tx(["negotiations", "players"], "readwrite");
+        // No need to check salary and roster space during resigning period.
+        isResigning = g.phase === g.PHASE.RESIGN_PLAYERS;
 
-        // Just save offer if not resigning. Player will decide
-        // along with other contracts.
+        tx = dao.tx(["negotiations", "players", "releasedPlayers"], "readwrite");
 
-        dao.players.get({ot: tx, key: pid}).then(function (p) {
-            var mood;
+        return Promise.join(
+            getAllNegoWithAmount(tx, g.userTid),
+            dao.players.get({ot: tx, key: pid}),
+            function(allNego, p) {
+                var nego = _.findWhere(allNego.objects, {pid: pid});
+                // exclude current nego from total
+                return team.getPayroll(tx, nego.tid)
+                    .then(function(result) {
+                        var numOfReleased = _.countBy(result[1], 'released'),
+                            rosterSize,
+                            salarySpace;
 
-            mood = p.freeAgentMood[g.userTid];
-            p.freeAgentMood[g.userTid] += random.uniform(0, 0.15);
-            if (p.freeAgentMood[g.userTid] > 1) {
-                p.freeAgentMood[g.userTid] = 1;
+                        rosterSize = numOfReleased.false + allNego.objects.length;
+
+                        // Exclude current negotiation if it already exist.
+                        if (nego) {
+                            rosterSize -= 1;
+                            allNego.amount -= nego.team.amount;
+                        }
+                        salarySpace = Math.max(g.salaryCap - result[0], 0);
+                        salarySpace = Math.max(salarySpace, g.minContract);
+                        return {
+                            nego: nego,
+                            p: p,
+                            rosterSize: rosterSize,
+                            salarySpace: salarySpace,
+                            negoTotal: allNego.amount
+                        }
+                    });
             }
-            // Increase mood depending on how less the offer grade from
-            // passing the cut off.
+        )
+        .then(function(result) {
+            var diffGrade,
+                nego = result.nego,
+                offerGrade,
+                p = result.p,
+                t = result;
 
-            dao.players.put({ot: tx, value: p});
+            nego.team.amount = teamAmount;
+            nego.team.years = teamYears;
 
-            dao.negotiations.get({ot: tx, key: pid}).then(function (negotiation) {
-                var diffPlayerOrig, diffTeamOrig;
+            t.negoTotal += nego.team.amount;
+            console.log(t.negoTotal, t.salarySpace, t.rosterSize, teamAmount);
 
-                // Player responds based on their mood
-                if (negotiation.orig.amount >= 18000) {
-                    // Expensive guys don't negotiate
-                    negotiation.player.amount *= 1 + 0.05 * mood;
-                } else {
-                    if (teamYears === negotiation.player.years) {
-                        // Team and player agree on years, so just update amount
-                        if (teamAmount >= negotiation.player.amount) {
-                            negotiation.player.amount = teamAmount;
-                        } else if (teamAmount > 0.7 * negotiation.player.amount) {
-                            negotiation.player.amount = (0.5 * (1 + mood)) * negotiation.orig.amount + (0.5 * (1 - mood)) * teamAmount;
-                        } else {
-                            negotiation.player.amount *= 1.05;
-                        }
-                    } else if ((teamYears > negotiation.player.years && negotiation.orig.years > negotiation.player.years) || (teamYears < negotiation.player.years && negotiation.orig.years < negotiation.player.years)) {
-                        // Team moves years closer to original value
+            if (!isResigning && t.rosterSize + 1 > g.maxRosterSize) {
+                return "Your roster is full (includes offered contracts). Before you can offer a free agent, you'll have to release or trade away one of your current players or cancel a contract offer to another free agent.";
+            }
 
-                        // Update years
-                        diffPlayerOrig = negotiation.player.years - negotiation.orig.years;
-                        diffTeamOrig = teamYears - negotiation.orig.years;
-                        if (diffPlayerOrig > 0 && diffTeamOrig > 0) {
-                            // Team moved towards player's original years without overshooting
-                            negotiation.player.years = teamYears;
-                        } else {
-                            // Team overshot original years
-                            negotiation.player.years = negotiation.orig.years;
-                        }
+            if (!isResigning && (t.salarySpace - t.negoTotal < 0 && teamAmount > g.minContract)) {
+                return 'This contract would put you over the salary cap. You cannot go over the salary cap to sign free agents to contracts higher than the minimum salary. Either negotiate for a lower contract or cancel the negotiation.';
+            }
 
-                        // Update amount
-                        if (teamAmount > negotiation.player.amount) {
-                            negotiation.player.amount = teamAmount;
-                        } else if (teamAmount > 0.85 * negotiation.player.amount) {
-                            negotiation.player.amount = (0.5 * (1 + mood)) * negotiation.orig.amount + (0.5 * (1 - mood)) * teamAmount;
-                        } else {
-                            negotiation.player.amount *= 1.05;
-                        }
-                    } else {
-                        // Team move years further from original value
-                        if (teamAmount > 1.1 * negotiation.player.amount) {
-                            negotiation.player.amount = teamAmount;
-                            if (teamYears > negotiation.player.years) {
-                                negotiation.player.years += 1;
-                            } else {
-                                negotiation.player.years -= 1;
-                            }
-                        } else if (teamAmount > 0.9 * negotiation.player.amount) {
-                            negotiation.player.amount *= 1.15;
-                            if (teamYears > negotiation.player.years) {
-                                negotiation.player.years += 1;
-                            } else {
-                                negotiation.player.years -= 1;
-                            }
-                        } else {
-                            negotiation.player.amount *= 1.15;
-                        }
-                    }
+            offerGrade = freeAgents.gradeOffer(negotiationToOffer(nego), p);
+            diffGrade = Math.max(0.9 - offerGrade, 0);
+            // mood only increases (less favorable)
+            nego.grade = offerGrade;
+            p.freeAgentMood[nego.tid] += Math.abs(diffGrade) * random.randInt(1, 3) + .05;
+            return Promise.join(
+                dao.players.put({ot: tx, value: p}),
+                dao.negotiations.put({ot: tx, value: nego})
+            )
+            .then(function() {
+                require("core/league").updateLastDbChange();
+            })
 
-                    // General punishment from angry players
-                    if (mood > 0.25) {
-                        negotiation.player.amount *= 1 + 0.1 * mood;
-                    }
-                }
+            // TODO: If it is regular season and player roster is below minimum
+            // have the player decide on the contract immediately.
+            // tickFreeAgencyDay? or just decide on contract.
 
-                negotiation.player.amount = validAmount(negotiation.player.amount);
-                negotiation.player.years = validYears(negotiation.player.years);
-
-                negotiation.team.amount = teamAmount;
-                negotiation.team.years = teamYears;
-
-                dao.negotiations.put({ot: tx, value: negotiation});
-            });
-        });
-
-        return tx.complete().then(function () {
-            require("core/league").updateLastDbChange();
         });
     }
 
