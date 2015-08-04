@@ -303,9 +303,18 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
      * @return {Promise}
      */
     function cancel(pid, notDelete) {
-        var tx;
+        var tx, updateF;
         notDelete = notDelete || false;
         tx = dao.tx(["gameAttributes", "messages", "negotiations"], "readwrite");
+
+        updateF = function() {
+            if (g.phase === g.PHASE.FREE_AGENCY) {
+                ui.updateStatus(g.daysLeft + " days left");
+            } else {
+                ui.updateStatus("Idle");
+            }
+            ui.updatePlayMenu(tx);
+        }
 
         if (notDelete) {
             return dao.negotiations.get({ot: tx, key: pid})
@@ -315,25 +324,11 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                     nego.grade = null;
                     return dao.negotiations.put({ot: tx, value: nego});
                 })
-                .then(function() {
-                    require("core/league").updateLastDbChange();
-                })
+                .then(updateF);
+        } else {
+            // Delete negotiation
+            dao.negotiations.delete({ot: tx, key: pid}).then(updateF);
         }
-
-        // Delete negotiation
-        dao.negotiations.delete({ot: tx, key: pid}).then(function () {
-            // If no negotiations are in progress, update status
-            return lock.negotiationInProgress(tx);
-        }).then(function (negotiationInProgress) {
-            if (!negotiationInProgress) {
-                if (g.phase === g.PHASE.FREE_AGENCY) {
-                    ui.updateStatus(g.daysLeft + " days left");
-                } else {
-                    ui.updateStatus("Idle");
-                }
-                ui.updatePlayMenu(tx);
-            }
-        });
 
         return tx.complete().then(function () {
             require("core/league").updateLastDbChange();
