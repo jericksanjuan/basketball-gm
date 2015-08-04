@@ -7,6 +7,13 @@
 Your players will decide before the start of free agency. The mood meter will indicate the likeliness of them resigning with you. Aim for a green mood meter.
 </p>
 
+<p>
+The current payroll (<strong data-bind="currency: [payroll, 'M']"></strong>) is <span data-bind="text: capText"></span> the salary cap (<strong data-bind="currency: [salaryCap, 'M']"></strong>), and <span data-bind="text: taxText"></span> the luxury tax limit (<strong data-bind="currency: [luxuryPayroll, 'M']"></strong>).
+</p>
+
+<p data-bind="visible: luxuryTax() > 0"> Expected luxury tax is <strong data-bind="currency: [luxuryTax, 'M']"></strong>.</p>
+
+
 <div class="table-responsive">
   <table class="table table-striped table-bordered table-condensed" id="negotiation-list">
     <thead>
