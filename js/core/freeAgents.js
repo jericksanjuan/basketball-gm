@@ -132,11 +132,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 var i;
 
                 // Decrease free agent demands
-                if (!p.contract.is_min) {
-                    p.contract.amount -= 50;
-                    if (p.contract.amount < 500) {
-                        p.contract.amount = 500;
-                    }
+                p.contract.amount -= 50;
+                if (p.contract.amount < 500) {
+                    p.contract.amount = 500;
                 }
 
                 if (g.phase !== g.PHASE.FREE_AGENCY) {
