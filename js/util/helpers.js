@@ -1,4 +1,4 @@
-/**
+    /**
  * @name util.helpers
  * @namespace Various utility functions that don't have anywhere else to go.
  */
@@ -882,6 +882,28 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
         return (arg > 0 ? "+" : "") + round(arg, d);
     }
 
+    /**
+     * Toggle mute and unmute console output
+     * @param  {Boolean} toMute If true no output
+     */
+    function muteConsole(toMute) {
+        var methods = ["log", "debug", "info"],
+            methodsTmp = ["logTmp", "debugTmp", "infoTmp"];
+
+        if(!window.console) window.console = {};
+        if (toMute) {
+            for(var i=0;i<methods.length;i++){
+                console[methodsTmp[i]] = console[methods[i]];
+                console[methods[i]] = function(){};
+            }
+        } else {
+            for(var i=0;i<methods.length;i++){
+                console[methods[i]] = console[methodsTmp[i]];
+                console[methodsTmp[i]] = function(){};
+            }
+        }
+    }
+
     return {
         validateAbbrev: validateAbbrev,
         getAbbrev: getAbbrev,
@@ -914,6 +936,7 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
         checkNaNs: checkNaNs,
         gameScore: gameScore,
         updateMultiTeam: updateMultiTeam,
-        plusMinus: plusMinus
+        plusMinus: plusMinus,
+        muteConsole: muteConsole
     };
 });

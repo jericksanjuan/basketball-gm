@@ -88,15 +88,13 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                     return dao.players.get({ot: tx, key: +pid})
                 })
                 .each(function(p) {
-                    console.log(p);
                     offers = perPlayer[p.pid].sort(function(a, b) { return b.grade - a.grade; });
-                    console.log(offers);
                     for (j = 0; j < offers.length; j++ ) {
                         // slightly random passing grade
                         if (offers[j].grade > random.uniform(0.88, 0.92)) {
                             return freeAgents.acceptContract(p, offers[j], [], tx, 'reSigned');
                         } else {
-                            text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign with ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a>.'
+                            text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign with ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[offers[j].tid], g.season]) + '">' + g.teamNamesCache[offers[j].tid] + '</a>.'
                             bbgmNotifications.notify(text, 'Free Agency', true);
                         }
                     }

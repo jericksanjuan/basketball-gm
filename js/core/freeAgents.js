@@ -380,6 +380,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
     function tickFreeAgencyDay(tx) {
         var contractNegotiation = require('core/contractNegotiation');
+        helpers.muteConsole(!g.debugOutput["free agency"]);
         console.log(g.daysLeft, 'of Free Agency');
         tx = dao.tx(["players", "releasedPlayers", "teams", "playerStats", "negotiations"], "readwrite", tx);
 
@@ -451,7 +452,10 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                         });
                     });
             }
-        );
+        )
+        .then(function() {
+            helpers.muteConsole(false);
+        })
     }
 
     /**
@@ -572,7 +576,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 g.salaryCap - sumContracts(t.player) - releasedSalaries[team.tid]);
             team.fa.salarySpace = Math.max(team.fa.salarySpace, g.minContract);
             team.fa.minSigningScore = teamMinSigningScore(t.player, team, rotCutoff);
-            console.log(team.tid, 'minSigningScore', team.fa.minSigningScore);
 
             // ensure fuzzValue exist.
             team.fuzzValue = team.fuzzValue || player.genFuzz(t.scoutingRank);

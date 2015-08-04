@@ -83,7 +83,6 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             negotiationsOffered = _.groupBy(negotiationsOffered, "pid")
 
             for (i = 0; i < players.length; i++) {
-                players[i].contract.amount = freeAgents.amountWithMood(players[i].contract.amount, players[i].freeAgentMood[g.userTid]);
                 players[i].mood = player.moodColorText(players[i]);
 
                 if (negotiationsPids.indexOf(players[i].pid) >= 0) {

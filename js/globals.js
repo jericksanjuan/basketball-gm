@@ -21,6 +21,7 @@ define(["lib/knockout"], function (ko) {
     g.minContract = 500;  // [thousands of dollars]
     g.maxContract = 20000;  // [thousands of dollars]
     g.minRosterSize = 10;
+    g.maxRosterSize = 15;
 
     // Constants in all caps
     g.PHASE = {
@@ -175,8 +176,18 @@ define(["lib/knockout"], function (ko) {
 
     g.stripePublishableKey = "pk_live_Dmo7Vs6uSaoYHrFngr4lM0sa";
 
+    g.debugOutput = {
+        "preseason": true,
+        "regular season": true,
+        "playoffs": true,
+        "before draft": true,
+        "draft": true,
+        "re-sign players": false,
+        "free agency": false,
+    }
+
     // THIS MUST BE ACCURATE OR BAD STUFF WILL HAPPEN
-    g.notInDb = ["dbm", "dbl", "lid", "confs", "divs", "salaryCap", "minPayroll", "luxuryPayroll", "luxuryTax", "minContract", "maxContract", "minRosterSize", "PHASE", "PLAYER", "PHASE_TEXT", "gameSimWorkers", "vm", "enableLogging", "tld", "sport", "compositeWeights", "stripePublishableKey", "notInDb"];
+    g.notInDb = ["dbm", "dbl", "lid", "confs", "divs", "salaryCap", "minPayroll", "luxuryPayroll", "luxuryTax", "minContract", "maxContract", "minRosterSize", "maxRosterSize", "PHASE", "PLAYER", "PHASE_TEXT", "gameSimWorkers", "vm", "enableLogging", "tld", "sport", "compositeWeights", "stripePublishableKey", "notInDb", "debugOutput"];
 
     return g;
 });
