@@ -78,11 +78,11 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
             promises = [];
 
             for (i = 0; i < numPlayers; i++) {
-                baseRating = random.randInt(8, 31);
-                pot = Math.round(helpers.bound(random.realGauss(48, 17), baseRating, 90));
+                baseRating = Math.floor(helpers.bound(random.realGauss(21, 11), 15, 70))
+                pot = Math.floor(helpers.bound(random.realGauss(48, 17), baseRating, 90));
 
                 profile = profiles[random.randInt(0, profiles.length - 1)];
-                agingYears = random.randInt(0, 3);
+                agingYears = Math.floor(helpers.bound(random.realGauss(2, 1), 0, 3));
                 draftYear = g.season;
 
                 baseAge = 19;

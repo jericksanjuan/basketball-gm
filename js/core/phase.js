@@ -612,8 +612,132 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
         }
     }
 
+    function testDevelop() {
+        var tx = dao.tx(["gameAttributes","draftPicks", "draftOrder", "players", "playerStats", "teams", "trade", "releasedPlayers", "awards", "schedule", "playoffSeries", "negotiations", "messages", "games", "events", "playerFeats"], "readwrite");
+
+        Promise.try(function() {
+            return require("core/league").setGameAttributes(tx, {season: g.season + 1});
+        }).then(function () {
+            var coachingRanks, scoutingRank;
+
+            coachingRanks = [];
+
+            // Add row to team stats and season attributes
+            return dao.teams.iterate({
+                ot: tx,
+                callback: function (t) {
+                    // Save the coaching rank for later
+                    coachingRanks[t.tid] = _.last(t.seasons).expenses.coaching.rank;
+
+                    // Only need scoutingRank for the user's team to calculate fuzz when ratings are updated below.
+                    // This is done BEFORE a new season row is added.
+                    if (t.tid === g.userTid) {
+                        scoutingRank = finances.getRankLastThree(t, "expenses", "scouting");
+                    }
+
+                    t = team.addSeasonRow(t);
+                    t = team.addStatsRow(t);
+
+                    return t;
+                }
+
+            }).then(function() {
+                return dao.players.iterate({
+                    ot: tx,
+                    index: "tid",
+                    key: g.PLAYER.UNDRAFTED,
+                    callback: function (p) {
+                        p.tid = g.PLAYER.FREE_AGENT;
+                        p.ratings[0].fuzz = 0;
+                        return p;
+                    }
+                });
+            }).then(function () {
+                var count = 0;
+                // Loop through all non-retired players
+                return dao.players.iterate({
+                    ot: tx,
+                    index: "tid",
+                    key: IDBKeyRange.lowerBound(g.PLAYER.FREE_AGENT),
+                    callback: function (p) {
+
+                        // Update ratings
+                        p = player.addRatingsRow(p, scoutingRank);
+                        p = player.develop(p, 1, false, coachingRanks[p.tid]);
+
+                        // Update player values after ratings changes
+                        return player.updateValues(tx, p, []).then(function (p) {
+                            // Add row to player stats if they are on a team
+                            if (p.tid >= 0) {
+                                p = player.addStatsRow(tx, p, false);
+                            }
+
+                            var age, pot, maxAge, minPot, excessAge, excessPot;
+                            pot = p.ratings[p.ratings.length-1].pot;
+                            maxAge = 34;
+                            minPot = 40;
+
+                            if (p.draft.year > g.season) {
+                                // Draft prospect
+                                age = p.draft.year - p.born.year;
+                            } else {
+                                age = g.season - p.born.year;
+                            }
+
+                            if (age > maxAge || pot < minPot) {
+                                excessAge = 0;
+                                if (age > 34 || p.tid === g.PLAYER.FREE_AGENT) {  // Only players older than 34 or without a contract will retire
+                                    if (age > 34) {
+                                        excessAge = (age - 34) / 20;  // 0.05 for each year beyond 34
+                                    }
+                                    excessPot = (40 - pot) / 50;  // 0.02 for each potential rating below 40 (this can be negative)
+                                    var f = helpers.bound(random.realGauss(0,1), -1, 4);
+                                    // var f = helpers.bound(Math.round(random.realGauss(0,1)), -1, 4);
+                                    if (excessAge + excessPot + f > 0) {
+                                        p = player.retire(tx, p, []);
+                                    }
+                                }
+                            }
+
+                            return p;
+                        });
+                    }
+                });
+            });
+        }).then(function() {
+
+            // Bump up future draft classes (nested so tid updates don't cause race conditions)
+
+            return dao.players.iterate({
+                    ot: tx,
+                    index: "tid",
+                    key: g.PLAYER.UNDRAFTED_2,
+                    callback: function (p) {
+                        p.tid = g.PLAYER.UNDRAFTED;
+                        p.ratings[0].fuzz /= 2;
+                        return p;
+                    }
+            });
+            }).then(function () {
+                return dao.players.iterate({
+                    ot: tx,
+                    index: "tid",
+                    key: g.PLAYER.UNDRAFTED_3,
+                    callback: function (p) {
+                        p.tid = g.PLAYER.UNDRAFTED_2;
+                        p.ratings[0].fuzz /= 2;
+                        return p;
+                    }
+                });
+            }).then(function () {
+                // Create new draft class for 3 years in the future
+                return draft.genPlayers(tx, g.PLAYER.UNDRAFTED_3);
+            });
+    }
+
     return {
         newPhase: newPhase,
-        abort: abort
+        abort: abort,
+        testDevelop: testDevelop
     };
 });
