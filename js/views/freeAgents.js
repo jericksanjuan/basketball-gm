@@ -50,9 +50,10 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 index: "tid",
                 key: g.PLAYER.FREE_AGENT,
                 statsSeasons: [g.season, g.season - 1]
-            })
-        ]).spread(function (payroll, userPlayers, players) {
-            var capSpace, i;
+            }),
+            dao.negotiations.getAll()
+        ]).spread(function (payroll, userPlayers, players, negotiations) {
+            var capSpace, i, negotiationsOffered, negotiationsPids;
 
             capSpace = (g.salaryCap - payroll) / 1000;
             if (capSpace < 0) {
@@ -70,9 +71,26 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 oldStats: true
             });
 
+            // For Multi Team Mode, might have other team's negotiations going on
+            negotiations = negotiations.filter(function (negotiation) {
+                return negotiation.tid === g.userTid;
+            });
+
+            negotiationsOffered = negotiations.filter(function(negotiation) {
+                return negotiation.team.years > 0 && negotiation.team.amount > 0;
+            })
+            negotiationsPids = _.pluck(negotiationsOffered, "pid")
+            negotiationsOffered = _.groupBy(negotiationsOffered, "pid")
+
             for (i = 0; i < players.length; i++) {
                 players[i].contract.amount = freeAgents.amountWithMood(players[i].contract.amount, players[i].freeAgentMood[g.userTid]);
                 players[i].mood = player.moodColorText(players[i]);
+
+                if (negotiationsPids.indexOf(players[i].pid) >= 0) {
+                    players[i].offered = true
+                    players[i].contract.amount = negotiationsOffered[players[i].pid][0].team.amount / 1000;
+                    players[i].contract.exp = negotiationsOffered[players[i].pid][0].team.years + g.season;
+                }
             }
 
             return {
@@ -95,8 +113,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
         ko.computed(function () {
             ui.datatable($("#free-agents"), 4, _.map(vm.players(), function (p) {
                 var negotiateButton;
-                if (freeAgents.refuseToNegotiate(p.contract.amount * 1000, p.freeAgentMood[g.userTid])) {
-                    negotiateButton = "Refuses!";
+                if (p.offered) {
+                    negotiateButton = '<form action="' + helpers.leagueUrl(["negotiation", p.pid], {noQueryString: true}) + '" method="POST" style="margin: 0"><input type="hidden" name="new" value="1"><button type="submit" class="btn btn-info btn-xs">Change Offer</button></form>';
                 } else {
                     negotiateButton = '<form action="' + helpers.leagueUrl(["negotiation", p.pid], {noQueryString: true}) + '" method="POST" style="margin: 0"><input type="hidden" name="new" value="1"><button type="submit" class="btn btn-default btn-xs">Negotiate</button></form>';
                 }

@@ -302,10 +302,23 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
      * @param {number} pid An integer that must correspond with the player ID of a player in an ongoing negotiation.
      * @return {Promise}
      */
-    function cancel(pid) {
+    function cancel(pid, notDelete) {
         var tx;
-
+        notDelete = notDelete || false;
         tx = dao.tx(["gameAttributes", "messages", "negotiations"], "readwrite");
+
+        if (notDelete) {
+            return dao.negotiations.get({ot: tx, key: pid})
+                .then(function(nego) {
+                    nego.team.amount = 0;
+                    nego.team.years = 0;
+                    nego.grade = null;
+                    return dao.negotiations.put({ot: tx, value: nego});
+                })
+                .then(function() {
+                    require("core/league").updateLastDbChange();
+                })
+        }
 
         // Delete negotiation
         dao.negotiations.delete({ot: tx, key: pid}).then(function () {

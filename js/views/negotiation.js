@@ -29,12 +29,13 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
     }
 
     function post(req) {
-        var pid, teamAmountNew, teamYearsNew;
+        var notDelete, pid, teamAmountNew, teamYearsNew;
 
         pid = parseInt(req.params.pid, 10);
+        notDelete = g.phase === g.PHASE.RESIGN_PLAYERS;
 
         if (req.params.hasOwnProperty("cancel")) {
-            contractNegotiation.cancel(pid).then(function () {
+            contractNegotiation.cancel(pid, notDelete).then(function () {
                 redirectNegotiationOrRoster(true);
             });
         } else if (req.params.hasOwnProperty("accept")) {

@@ -34,12 +34,17 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "lib/bluebird"
                 statsTid: g.userTid
             })
         ]).spread(function (negotiations, players) {
-            var i, j, negotiationPids;
+            var i, j, negotiationPids, negotiationsOffered;
 
             // For Multi Team Mode, might have other team's negotiations going on
             negotiations = negotiations.filter(function (negotiation) {
                 return negotiation.tid === g.userTid;
             });
+
+            negotiationsOffered = negotiations.filter(function(negotiation) {
+                return negotiation.team.years > 0 && negotiation.team.amount > 0;
+            })
+            negotiationsOffered = _.pluck(negotiationsOffered, "pid")
 
             negotiationPids = _.pluck(negotiations, "pid");
 
@@ -63,6 +68,11 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "lib/bluebird"
                         players[i].contract = {};
                         players[i].contract.amount = negotiations[j].player.amount / 1000;
                         players[i].contract.exp = g.season + negotiations[j].player.years;
+                        if (negotiationsOffered.indexOf(players[i].pid) >= 0) {
+                            players[i].offered = true;
+                            players[i].contract.amount = negotiations[j].team.amount / 1000;
+                            players[i].contract.exp = g.season + negotiations[j].team.years;
+                        }
                         break;
                     }
                 }
@@ -82,12 +92,11 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "lib/bluebird"
         ko.computed(function () {
             ui.datatable($("#negotiation-list"), 4, _.map(vm.players(), function (p) {
                 var negotiateButton;
-                if (freeAgents.refuseToNegotiate(p.contract.amount * 1000, p.freeAgentMood[g.userTid])) {
-                    negotiateButton = "Refuses!";
-                } else {
-                    // This can be a plain link because the negotiation has already been started at this point.
+               if (p.offered) {
+                    negotiateButton = '<a href="' + helpers.leagueUrl(["negotiation", p.pid]) + '" class="btn btn-info btn-xs">Change Offer</a>';
+               } else {
                     negotiateButton = '<a href="' + helpers.leagueUrl(["negotiation", p.pid]) + '" class="btn btn-default btn-xs">Negotiate</a>';
-                }
+               }
                 return [helpers.playerNameLabels(p.pid, p.name, p.injury, p.ratings.skills, p.watch), p.ratings.pos, String(p.age), String(p.ratings.ovr), String(p.ratings.pot), helpers.round(p.stats.min, 1), helpers.round(p.stats.pts, 1), helpers.round(p.stats.trb, 1), helpers.round(p.stats.ast, 1), helpers.round(p.stats.per, 1), helpers.formatCurrency(p.contract.amount, "M") + ' thru ' + p.contract.exp, '<div title="' + p.mood.text + '" style="width: 100%; height: 21px; background-color: ' + p.mood.color + '"><span style="display: none">' + p.freeAgentMood[g.userTid] + '</span></div>', negotiateButton];
             }));
         }).extend({throttle: 1});
