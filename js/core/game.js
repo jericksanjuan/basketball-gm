@@ -150,6 +150,21 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                 teamStats.oppPts += results.team[t2].stat.pts;
                 teamStats.ba += results.team[t2].stat.blk;
 
+                if (teamStats.hasOwnProperty('oppStats')) {
+                    for (i = 0; i < keys.length; i++) {
+                        teamStats.oppStats[keys[i]] += results.team[t2].stat[keys[i]];
+                    }
+                    teamStats.oppStats.gp += 1;
+                    teamStats.oppStats.trb += results.team[t2].stat.orb + results.team[t2].stat.drb
+                } else {
+                    teamStats['oppStats']  = {};
+                    for (i = 0; i < keys.length; i++) {
+                        teamStats.oppStats[keys[i]] = results.team[t2].stat[keys[i]];
+                    }
+                    teamStats.oppStats.gp = 1;
+                    teamStats.oppStats.trb = results.team[t2].stat.orb + results.team[t2].stat.drb
+                }
+
                 if (teamSeason.lastTen.length === 10 && g.phase !== g.PHASE.PLAYOFFS) {
                     teamSeason.lastTen.pop();
                 }
@@ -287,7 +302,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
     }
 
     function writeGameStats(tx, results, att) {
-        var gameStats, i, keys, p, t, text, tl, tw;
+        var gameStats, i, keys, opt, p, t, text, tl, tw;
 
         gameStats = {
             gid: results.gid,

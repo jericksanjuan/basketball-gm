@@ -1404,6 +1404,20 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
                         } else {
                             row.ftp = 0;
                         }
+                    } else if (stats[j] === 'tsp') {
+                        if (s.fga > 0 || s.fta > 0) {
+                            row.tsp = s.pts / (2 * (s.fga + 0.44 * s.fta));
+                        } else {
+                            row.tsp = 0;
+                        }
+                        row.tsp *= 100;
+                    } else if (stats[j] === 'efg') {
+                        if (s.fga > 0 || s.tp > 0) {
+                            row.efg = (s.fg + 0.5 * s.tp) / s.fga
+                        } else {
+                            row.efg = 0;
+                        }
+                        row.efg *= 100;
                     } else if (stats[j] === "season") {
                         row.season = s.season;
                     } else if (stats[j] === "age") {

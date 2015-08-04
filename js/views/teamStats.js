@@ -31,6 +31,7 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
                 attrs: ["abbrev"],
                 seasonAttrs: ["won", "lost"],
                 stats: ["gp", "fg", "fga", "fgp", "tp", "tpa", "tpp", "ft", "fta", "ftp", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "ba", "pf", "pts", "oppPts", "diff"],
+                // oppStats: ["trb", "tov"],
                 season: inputs.season
             }).then(function (teams) {
                 return {
