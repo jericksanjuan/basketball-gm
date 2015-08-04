@@ -1187,9 +1187,11 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
         };
         series[0][order + cid * 4].home.seed = teams[0].seed;
         series[0][order + cid * 4].away.seed = teams[1].seed;
+    }
 
     function correctLinkLid(event) {
         event.text = event.text.replace(/\/l\/\d+\//g, '/l/' + g.lid + '/');
+    }
 
     /**
      * Toggle mute and unmute console output
