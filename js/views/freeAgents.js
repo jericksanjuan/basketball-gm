@@ -2,7 +2,7 @@
  * @name views.freeAgents
  * @namespace List of free agents.
  */
-define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "lib/bluebird", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers"], function (dao, g, ui, freeAgents, player, team, Promise, $, ko, _, bbgmView, helpers) {
+define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "lib/bluebird", "lib/jquery", "lib/knockout", "lib/underscore", "util/bbgmView", "util/helpers", "core/contractNegotiation"], function (dao, g, ui, freeAgents, player, team, Promise, $, ko, _, bbgmView, helpers, contractNegotiation) {
     "use strict";
 
     var mapping;
@@ -51,14 +51,16 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 key: g.PLAYER.FREE_AGENT,
                 statsSeasons: [g.season, g.season - 1]
             }),
-            dao.negotiations.getAll()
-        ]).spread(function (payroll, userPlayers, players, negotiations) {
-            var capSpace, i, negotiationsOffered, negotiationsPids;
+            contractNegotiation.getAllNegoWithAmount(null, g.userTid)
+        ]).spread(function (payroll, userPlayers, players, allNego) {
+            var capSpace, i, negoRosterSpots, negoSpace, negotiations, negotiationsOffered, negotiationsPids, numRosterSpots;
 
             capSpace = (g.salaryCap - payroll) / 1000;
             if (capSpace < 0) {
                 capSpace = 0;
             }
+            numRosterSpots = g.maxRosterSize - userPlayers.length;
+            negoRosterSpots = numRosterSpots - allNego.objects.length;
 
             players = player.filter(players, {
                 attrs: ["pid", "name", "age", "contract", "freeAgentMood", "injury", "watch"],
@@ -72,7 +74,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             });
 
             // For Multi Team Mode, might have other team's negotiations going on
-            negotiations = negotiations.filter(function (negotiation) {
+            negotiations = allNego.objects.filter(function (negotiation) {
                 return negotiation.tid === g.userTid;
             });
 
@@ -81,6 +83,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             })
             negotiationsPids = _.pluck(negotiationsOffered, "pid")
             negotiationsOffered = _.groupBy(negotiationsOffered, "pid")
+
+            negoSpace = Math.max(capSpace - allNego.amount / 1000, 0.5);
 
             for (i = 0; i < players.length; i++) {
                 players[i].mood = player.moodColorText(players[i]);
@@ -94,7 +98,11 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
 
             return {
                 capSpace: capSpace,
-                numRosterSpots: 15 - userPlayers.length,
+                negoSpace: negoSpace,
+                numRosterSpots: numRosterSpots,
+                negoRosterSpots: negoRosterSpots,
+                negoLen: negotiations.length,
+                negoAmount: allNego.amount / 1000,
                 players: players
             };
         });

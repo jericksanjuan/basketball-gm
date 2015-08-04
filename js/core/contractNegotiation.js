@@ -438,6 +438,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
         create: create,
         offer: offer,
         getAllUserOffers: getAllUserOffers,
-        decidePlayerResignOffers: decidePlayerResignOffers
+        getAllNegoWithAmount: getAllNegoWithAmount,
+        decidePlayerResignOffers: decidePlayerResignOffers,
     };
 });

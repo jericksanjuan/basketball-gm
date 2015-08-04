@@ -2,15 +2,13 @@
  * @name views.negotiation
  * @namespace Contract negotiation.
  */
-define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core/team", "lib/knockout", "util/bbgmView", "util/helpers"], function (dao, g, ui, contractNegotiation, player, team, ko, bbgmView, helpers) {
+define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core/team", "lib/knockout", "util/bbgmView", "util/helpers", "lib/bluebird"], function (dao, g, ui, contractNegotiation, player, team, ko, bbgmView, helpers, Promise) {
     "use strict";
 
     // Show the negotiations list if there are more ongoing negotiations
     function redirectNegotiationOrRoster(cancelled) {
         dao.negotiations.getAll().then(function (negotiations) {
-            if (negotiations.length > 0) {
-                ui.realtimeUpdate([], helpers.leagueUrl(["negotiation"]));
-            } else if (cancelled) {
+            if (cancelled) {
                 ui.realtimeUpdate([], helpers.leagueUrl(["free_agents"]));
             } else {
                 ui.realtimeUpdate([], helpers.leagueUrl(["roster"]));
@@ -110,7 +108,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
                 key: negotiation.pid
             }).then(function (p) {
                 p = player.filter(p, {
-                    attrs: ["pid", "name", "freeAgentMood"],
+                    attrs: ["pid", "name", "freeAgentMood", "born", "draft", "salaries"],
                     ratings: ["ovr", "pot"],
                     season: g.season,
                     showNoStats: true,
@@ -137,30 +135,37 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
                     p.mood = '<span class="text-danger"><b>Insulted by your presence.</b></span>';
                 }
                 p.grade = negotiation.grade * 100;
-                p.gradep = ((p.grade - 80)/20) * 100;
+                p.gradep = ((p.grade)/100) * 100;
+                p.age = g.season - p.born.year;
+                p.yearsPro = g.season - p.draft.year;
+                p.lastSalary = _.last(p.salaries).amount;
                 delete p.freeAgentMood;
 
-                return team.getPayroll(null, g.userTid).get(0).then(function (payroll) {
-                    return {
-                        salaryCap: g.salaryCap / 1000,
-                        payroll: payroll / 1000,
-                        team: {region: g.teamRegionsCache[g.userTid], name: g.teamNamesCache[g.userTid]},
-                        player: p,
-                        negotiation: {
-                            team: {
-                                amount: ((negotiation.team.amount) ? negotiation.team.amount : negotiation.player.amount) / 1000,
-                                years: (negotiation.team.years) ? negotiation.team.years : negotiation.player.years,
-                                expiration: (negotiation.team.expiration) ? negotiation.team.expiration : negotiation.player.expiration
-                            },
-                            player: {
-                                amount: negotiation.player.amount / 1000,
-                                expiration: negotiation.player.expiration,
-                                years: negotiation.player.years
-                            },
-                            resigning: negotiation.resigning
-                        }
-                    };
-                });
+                return Promise.join(
+                    team.getPayroll(null, g.userTid).get(0),
+                    contractNegotiation.getAllNegoWithAmount(null, g.userTid),
+                    function (payroll, allNego) {
+                        return {
+                            salaryCap: g.salaryCap / 1000,
+                            payroll: payroll / 1000,
+                            negoSpace: Math.max((g.salaryCap - payroll - allNego.amount) / 1000, 0.5),
+                            team: {region: g.teamRegionsCache[g.userTid], name: g.teamNamesCache[g.userTid]},
+                            player: p,
+                            negotiation: {
+                                team: {
+                                    amount: ((negotiation.team.amount) ? negotiation.team.amount : negotiation.player.amount) / 1000,
+                                    years: (negotiation.team.years) ? negotiation.team.years : negotiation.player.years,
+                                    expiration: (negotiation.team.expiration) ? negotiation.team.expiration : negotiation.player.expiration
+                                },
+                                player: {
+                                    amount: negotiation.player.amount / 1000,
+                                    expiration: negotiation.player.expiration,
+                                    years: negotiation.player.years
+                                },
+                                resigning: negotiation.resigning
+                            }
+                        };
+                    });
             });
         });
     }

@@ -54,9 +54,14 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/game", "core/league", "
             }
         } else if (amount === "untilFreeAgency") {
             if (g.phase === g.PHASE.RESIGN_PLAYERS) {
-                dao.negotiations.count().then(function (numRemaining) {
+                dao.negotiations.getAll().then(function (negoAll) {
+                    var numRemaining;
+                    negoAll = negoAll.filter(function(n) {
+                        return n.team.amount === 0 && n.team.years === 0;
+                    })
+                    numRemaining = negoAll.length;
                     // Show warning dialog only if there are players remaining un-re-signed
-                    if (numRemaining === 0 || window.confirm("Are you sure you want to proceed to free agency while " + numRemaining + " of your players remain unsigned? If you do not re-sign them before free agency begins, they will be free to sign with any team, and you won't be able to go over the salary cap to sign them.")) {
+                    if (numRemaining === 0 || window.confirm(numRemaining + " of your players do not have an offer to resign with your team. If you do not offer them a contract before free agency begins, they will be free to sign with any team, and you won't be able to go over the salary cap to sign them.")) {
                         phase.newPhase(g.PHASE.FREE_AGENCY).then(function () {
                             ui.updateStatus(g.daysLeft + " days left");
                         });

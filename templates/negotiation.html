@@ -9,10 +9,14 @@
     <p>
       Mood: <span data-bind="html: player.mood"></span><br>
       <div class="progress">
-        <div data-bind="attr: { 'aria-valuenow': player.grade(), style: 'width: ' + player.gradep() + '%;' }, css: { 'progress-bar-success': player.grade() > 90, 'progress-bar-warning': player.grade() < 90 }" class="progress-bar" role="progressbar" aria-valuemin="80" aria-valuemax="100">
+        <div data-bind="attr: { 'aria-valuenow': player.grade(), style: 'width: ' + player.gradep() + '%;' }, css: { 'progress-bar-success': player.grade() > 90, 'progress-bar-warning': player.grade() < 90, 'progress-bar-danger': player.grade() < 50 }" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
         </div>
       </div>
-      Overall: <span data-bind="text: player.ratings.ovr"></span>; Potential: <span data-bind="text: player.ratings.pot"></span>
+      Overall: <span data-bind="text: player.ratings.ovr"></span> Potential: <span data-bind="text: player.ratings.pot"></span>
+      <br/>
+      Age: <span data-bind="text: player.age"></span> Years Pro: <span data-bind="text: player.yearsPro"></span>
+      <br/>
+      Last Salary: <span data-bind="currency: [player.lastSalary, 'M']"></span>
     </p>
       <h3>Player Desired Contract</h3>
       <p><span data-bind="text: negotiation.player.years"></span> years (through <span data-bind="text: negotiation.player.expiration"></span>)</p>
@@ -32,7 +36,8 @@
     <h2 data-bind="text: team.region() + ' ' + team.name()"></h2>
     <p>
       Current Payroll: <span data-bind="currency: [payroll, 'M']"></span><br>
-      Salary Cap: <span data-bind="currency: [salaryCap, 'M']"></span>
+      Salary Cap: <span data-bind="currency: [salaryCap, 'M']"></span><br>
+      Free Space: <span data-bind="currency: [negoSpace, 'M']"></span>
     </p>
     <h3>Your Proposal</h3>
     <form data-bind="attrLeagueUrl: {action: ['negotiation', player.pid]}" method="POST">
@@ -45,12 +50,16 @@
         <input type="text" class="form-control" name="teamAmount" data-bind="attr: {value: negotiation.team.amount}">
         <span class="input-group-addon">M per year</span>
       </div>
-      <button type="submit" class="btn btn-primary">Submit Proposal</button>
+      <button data-bind="visible: !player.grade()"type="submit" class="btn btn-primary">Submit Offer</button>
+      <button data-bind="visible: player.grade()"type="submit" class="btn btn-primary">Change Offer</button>
     </form>
     <p><form data-bind="attrLeagueUrl: {action: ['negotiation', player.pid]}" class="form-horizontal" method="POST">
       <input type="hidden" name="cancel" value="1">
       <button type="submit" class="btn btn-danger">Cancel Offer</button>
     </form>
+    </p>
+    <p>
+    <a data-bind="attrLeagueUrl: {href: ['free_agents']}" class="btn btn-info">Back to list</a>
     </p>
   </div>
 </div>
