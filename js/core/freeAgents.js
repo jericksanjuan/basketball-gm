@@ -269,71 +269,69 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         return offer.grade;
     }
 
+    function teamUpdate(tid, amount, tx) {
+        return dao.teams.get({
+                ot: tx,
+                key: tid
+            })
+            .then(function (t) {
+                console.log('accepted', g.teamAbbrevsCache[t.tid], t.fa.salarySpace, amount, t.fa.salarySpace - amount, t.fa.rosterSpace);
+                t.fa.salarySpace = Math.max(0, t.fa.salarySpace - amount);
+                t.fa.salarySpace = Math.max(t.fa.salarySpace, g.minContract);
+                t.fa.rosterSpace -= 1;
+                t.fa.rosterSpace = Math.max(0, t.fa.rosterSpace);
+                return dao.teams.put({
+                        ot: tx,
+                        value: t
+                    })
+                    .thenReturn(null);
+            });
+    };
+
+    function acceptContract(p, offer, otherTeams, tx, eventType) {
+        var userOffered = (g.autoPlaySeasons === 0 && otherTeams.indexOf(g.userTid) > -1);
+        tx = dao.tx(["teams", "players"], "readwrite", tx)
+        eventType = eventType || 'freeAgent';
+        // ^ use to show notification if user offered to player that was signed by another team.
+        p.tid = offer.tid;
+        p.contract.amount = offer.amount;
+        p.contract.exp = offer.exp;
+        if (g.phase <= g.PHASE.PLAYOFFS) {
+            p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
+        }
+        p = player.setContract(p, p.contract, true);
+        p.gamesUntilTradable = 15;
+
+        eventLog.add(null, {
+            type: eventType,
+            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
+            showNotification: p.tid === g.userTid || userOffered,
+            pids: [p.pid],
+            tids: [p.tid]
+        });
+        return teamUpdate(offer.tid, offer.amount, tx)
+            .then(function() {
+                return dao.negotiations.delete({ot: tx, key: p.pid});
+            })
+            .then(function () {
+                return dao.players.put({
+                        ot: tx,
+                        value: p
+                    })
+                    .then(function() {
+                        if (g.phase >= g.PHASE.PRESEASON || g.phase <= g.PHASE.REGULAR_SEASON) {
+                            return team.rosterAutoSort(tx, offer.tid);
+                        }
+                    });
+            });
+    };
+
+
     function decideContract(tx, p, offers, maxSalarySpace) {
-        var acceptContract, desiredMet, goContract, teamUpdate;
+        var desiredMet, goContract;
         offers = _.where(offers, {
             pid: p.pid
         });
-
-        teamUpdate = function (tid, amount) {
-            return dao.teams.get({
-                    ot: tx,
-                    key: tid
-                })
-                .then(function (t) {
-                    console.log('accepted', g.teamAbbrevsCache[t.tid], t.fa.salarySpace, amount, t.fa.salarySpace - amount, t.fa.rosterSpace);
-                    t.fa.salarySpace = Math.max(0, t.fa.salarySpace - amount);
-                    t.fa.salarySpace = Math.max(t.fa.salarySpace, g.minContract);
-                    t.fa.rosterSpace -= 1;
-                    t.fa.rosterSpace = Math.max(0, t.fa.rosterSpace);
-                    return dao.teams.put({
-                            ot: tx,
-                            value: t
-                        })
-                        .thenReturn(null);
-                });
-        };
-
-        acceptContract = function (offer, otherTeams) {
-            var userOffered = (g.autoPlaySeasons === 0 && otherTeams.indexOf(g.userTid) > -1);
-            // ^ use to show notification if user offered to player that was signed by another team.
-            p.tid = offer.tid;
-            p.contract.amount = offer.amount;
-            p.contract.exp = offer.exp;
-            if (g.phase <= g.PHASE.PLAYOFFS) {
-                p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
-            }
-            p = player.setContract(p, p.contract, true);
-            p.gamesUntilTradable = 15;
-
-            // TODO: show notification to user if offered player is signed by
-            // other team.
-            eventLog.add(null, {
-                type: "freeAgent",
-                text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
-                showNotification: p.tid === g.userTid || userOffered,
-                pids: [p.pid],
-                tids: [p.tid]
-            });
-            return teamUpdate(offer.tid, offer.amount)
-                .then(function() {
-                    // Delete user offers
-                    if (userOffered) {
-                        return dao.negotiations.delete({ot: tx, key: p.pid});
-                    }
-                })
-                .then(function () {
-                    return dao.players.put({
-                            ot: tx,
-                            value: p
-                        })
-                        .then(function() {
-                            if (g.phase >= g.PHASE.PRESEASON || g.phase <= g.PHASE.REGULAR_SEASON) {
-                                return team.rosterAutoSort(tx, offer.tid);
-                            }
-                        });
-                });
-        };
 
         // grade the offers
         if (offers.length > 0) {
@@ -349,7 +347,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         goContract = Math.random() > 0.95 - +desiredMet * 0.3 - (1 - g.daysLeft / 30);
         if (goContract && offers.length > 0) {
             console.log('accepted', p.value, p.name, g.teamAbbrevsCache[offers[0].tid], offers[0].amount, offers[0].grade, offers);
-            return acceptContract(offers[0], _.pluck(offers, 'tid'));
+            return acceptContract(p, offers[0], _.pluck(offers, 'tid'), tx);
         }
 
         if (p.contract.amount > maxSalarySpace) {
@@ -1091,6 +1089,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         tickRegSeasonFreeAgency: tickRegSeasonFreeAgency,
         cpuResignPlayers: cpuResignPlayers,
         gradePlayer: gradePlayer,
-        gradeOffer: gradeOffer
+        gradeOffer: gradeOffer,
+        acceptContract: acceptContract
     };
 });

@@ -2,7 +2,7 @@
  * @name core.contractNegotiation
  * @namespace All aspects of contract negotiation.
  */
-define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "lib/bluebird", "util/eventLog", "util/helpers", "util/lock", "util/random", "core/game"], function (dao, g, ui, freeAgents, player, team, Promise, eventLog, helpers, lock, random, game) {
+define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "lib/bluebird", "util/eventLog", "util/helpers", "util/lock", "util/random", "lib/bbgm-notifications"], function (dao, g, ui, freeAgents, player, team, Promise, eventLog, helpers, lock, random, bbgmNotifications) {
     "use strict";
 
     /**
@@ -17,7 +17,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             amount: nego.team.amount,
             exp: g.season + nego.team.years,
             skill: [],
-            signingScore: 0.6
+            signingScore: 0.6,
+            grade: nego.grade,
         }
         return offer;
     }
@@ -70,6 +71,37 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 amount: totalAmount
             }
         });
+    }
+
+    function decidePlayerResignOffers(tx) {
+        if (g.phase !== g.PHASE.RESIGN_PLAYERS) {
+            return;
+        }
+        tx = dao.tx(["negotiations", "players", "releasedPlayers", "teams"], "readwrite", tx);
+        return getAllUserOffers(tx)
+            .then(function(offers) {
+                var i, j, keys, offers, perPlayer, text;
+                perPlayer = _.groupBy(offers, 'pid')
+                keys = _.keys(perPlayer);
+                console.log(keys, perPlayer)
+                return Promise.map(keys, function(pid) {
+                    return dao.players.get({ot: tx, key: +pid})
+                })
+                .each(function(p) {
+                    console.log(p);
+                    offers = perPlayer[p.pid].sort(function(a, b) { return b.grade - a.grade; });
+                    console.log(offers);
+                    for (j = 0; j < offers.length; j++ ) {
+                        // slightly random passing grade
+                        if (offers[j].grade > random.uniform(0.88, 0.92)) {
+                            return freeAgents.acceptContract(p, offers[j], [], tx, 'reSigned');
+                        } else {
+                            text = '<a' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign with ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a>.'
+                            bbgmNotifications.notify(text, 'Free Agency', false);
+                        }
+                    }
+                });
+            });
     }
 
     /**
@@ -252,6 +284,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 dao.negotiations.put({ot: tx, value: nego})
             )
             .then(function() {
+                localStorage.signingSkip = 0;
                 require("core/league").updateLastDbChange();
             })
 
@@ -398,6 +431,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
         cancelAll: cancelAll,
         create: create,
         offer: offer,
-        getAllUserOffers: getAllUserOffers
+        getAllUserOffers: getAllUserOffers,
+        decidePlayerResignOffers: decidePlayerResignOffers
     };
 });
