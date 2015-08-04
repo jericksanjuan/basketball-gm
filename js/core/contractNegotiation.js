@@ -40,7 +40,6 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                 return n.team.years > 0;
             });
             offers = userNego.map(negotiationToOffer);
-            console.log(userNego);
             return _.sortBy(offers, "pid");
         });
     }
@@ -76,7 +75,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
     function decidePlayerResignOffers(tx, notResign) {
         notResign = notResign || false;
 
-        tx = dao.tx(["negotiations", "players", "releasedPlayers", "teams"], "readwrite", tx);
+        tx = dao.tx(["negotiations", "players", "playerStats", "releasedPlayers", "teams"], "readwrite", tx);
         return getAllUserOffers(tx)
             .then(function(offers) {
                 var i, j, keys, offers, perPlayer, text;
@@ -212,7 +211,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
      * @return {Promise}
      */
     function offer(pid, teamAmount, teamYears) {
-        var isResigning, tx;
+        var isResigning, oRosterSize, tx;
 
         teamAmount = validAmount(teamAmount);
         teamYears = validYears(teamYears);
@@ -238,6 +237,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                             return n.team.amount > 0 && n.team.years > 0 && n.pid != pid;
                         })
                         rosterSize = numOfReleased.false + allNego.objects.length;
+                        // assign to outside variable, for checking later
+                        oRosterSize = rosterSize;
 
                         // Exclude current negotiation if it already exist.
                         if (nego) {
@@ -288,12 +289,13 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             .then(function() {
                 localStorage.signingSkip = 0;
                 require("core/league").updateLastDbChange();
-            })
-
-            // TODO: If it is regular season and player roster is below minimum
-            // have the player decide on the contract immediately.
-            // tickFreeAgencyDay? or just decide on contract.
-
+            }).then(function() {
+                if (g.phase >= g.PHASE.PRESEASON && g.phase <= g.PHASE.PLAYOFFS) {
+                    if (oRosterSize < g.minRosterSize) {
+                        decidePlayerResignOffers(null, true);
+                    }
+                }
+            });
         });
     }
 

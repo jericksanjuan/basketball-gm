@@ -89,7 +89,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
 
             if (negotiations.length === 0) {
                 return {
-                    errorMessage: "No negotiation with player " + inputs.pid + " in progress."
+                    redirectUrl: helpers.leagueUrl(["free_agents"])
                 };
             }
 
