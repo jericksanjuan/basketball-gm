@@ -1654,6 +1654,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         mp = {};
         mp.value = cpuValue(p, fuzz);
         mp.born = p.born;
+        mp.draft = p.draft;
         mp.ratings = p.ratings;
         contract = genContract(mp);
 
