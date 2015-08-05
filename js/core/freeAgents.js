@@ -260,11 +260,16 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
     function gradeOffer(offer, p) {
         var amount, exp, mood, yr, yrOff;
-        yrOff = offer.exp - g.season;
-        yr = p.contract.exp - g.season;
+        yrOff = Math.max(offer.exp - g.season, 1);
+        yr = Math.max(p.contract.exp - g.season, 1);
         amount = offer.amount / (p.contract.amount * 0.5) - 1;
         exp = (yr - Math.abs(yr - yrOff)) / yr;
-        mood = 1 - p.freeAgentMood[offer.tid] / 2.5;
+        // FIXME: weird bug, freeAgentMood null causing infinity value on offerGrade. Happened on user team.
+        if (p.freeAgentMood[offer.tid] !== null) {
+            mood = 1 - p.freeAgentMood[offer.tid] / 2.5;
+        } else {
+            mood = 1;
+        }
         offer.grade = (2.5 * amount + 3 * exp + mood) / 6.5;
         return offer.grade;
     }
