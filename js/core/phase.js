@@ -735,9 +735,61 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             });
     }
 
+    /**
+    function revertPreseason() {
+        var tx = dao.tx(["gameAttributes", "players", "playerStats", "releasedPlayers", "teams", "negotiations", "messages"], "readwrite");
+
+        // return dao.players.iterate({
+        //     ot: tx,
+        //     index: "tid",
+        //     key: IDBKeyRange.lowerBound(g.PLAYER.FREE_AGENT),
+        //     callback: function(p) {
+        //         console.log(p.ratings.length);
+        //         console.log(p.ratings.splice(p.ratings.length-3, 3));
+        //         console.log(p.ratings.length);
+
+        //         // return p;
+        //     }
+        // })
+
+        return dao.playerStats.getAll({
+            ot: tx
+        }).then(function(allStats) {
+            var ids;
+            console.log(allStats.length);
+            allStats = allStats.filter(function(s) {return s.season === 2028 || s.season === 2029});
+            console.log(allStats.length);
+
+            ids = _.pluck(allStats, 'psid');
+            console.log(ids);
+
+            // return Promise.map(ids, function(psid) {
+            //     return dao.playerStats.delete({ot: tx, key: psid});
+            // })
+
+        });
+        /**
+        return dao.teams.iterate({
+            ot: tx,
+            callback: function(t) {
+                // console.log(t.seasons.length);
+                // console.log(t.seasons.splice(t.seasons.length - 4, 4));
+                // console.log(t.seasons.length);
+
+                // console.log(t.stats.length);
+                // console.log(t.stats.splice(t.stats.length - 3, 3));
+                // console.log(t.stats.length);
+                return t;
+            }
+        });
+    }
+    */
+
+
     return {
         newPhase: newPhase,
         abort: abort,
-        testDevelop: testDevelop
+        testDevelop: testDevelop,
+        //revertPreseason: revertPreseason
     };
 });

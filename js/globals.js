@@ -22,7 +22,7 @@ define(["lib/knockout"], function (ko) {
     g.maxContract = 20000;  // [thousands of dollars]
     g.minRosterSize = 10;
     g.maxRosterSize = 15;
-    g.divLeaderTop4 = false;
+    g.divLeaderTop4 = true;
 
     // Constants in all caps
     g.PHASE = {
