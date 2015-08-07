@@ -638,14 +638,14 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         }
 
         readyPlayer = function () {
-            return dao.players.iterate({
+            return dao.players.getAll({
                 ot: tx,
                 index: "tid",
-                key: key,
-                callback: function (p) {
-                    p.compositeRating = playerComposite(p.ratings);
-                    return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
-                }
+                key: key
+            }).map(function(p) {
+                console.log(p);
+                p.compositeRating = playerComposite(p.ratings);
+                return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
             });
         };
 

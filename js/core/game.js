@@ -564,6 +564,16 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
 
             // Initialize team composite rating object
             t.compositeRating = {};
+            // p can be undefined when player length === 0
+            if (p === undefined) {
+                p = {compositeRating: {}};
+                for (k in g.compositeWeights) {
+                    if (g.compositeWeights.hasOwnProperty(k)) {
+                        p.compositeRating[k] = 0;
+                    }
+                }
+                p.compositeRating.usage = 0;
+            }
             for (rating in p.compositeRating) {
                 if (p.compositeRating.hasOwnProperty(rating)) {
                     t.compositeRating[rating] = 0;
