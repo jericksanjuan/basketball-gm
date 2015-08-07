@@ -182,7 +182,7 @@ define(["lib/knockout"], function (ko) {
         "playoffs": true,
         "before draft": true,
         "draft": true,
-        "re-sign players": false,
+        "re-sign players": true,
         "free agency": false,
     }
 

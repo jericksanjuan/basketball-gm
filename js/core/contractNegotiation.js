@@ -78,7 +78,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
         tx = dao.tx(["negotiations", "players", "playerStats", "releasedPlayers", "teams"], "readwrite", tx);
         return getAllUserOffers(tx)
             .then(function(offers) {
-                var i, j, keys, offers, perPlayer, text;
+                var cutoff, i, j, keys, offers, perPlayer, text;
+                cutoff = (g.phase === g.PHASE.RESIGN_PLAYERS) ? freeAgents.OFFER_GRADE_CUTOFF : freeAgents.OFFER_GRADE_CUTOFF_FA;
                 perPlayer = _.groupBy(offers, 'pid')
                 keys = _.keys(perPlayer);
                 return Promise.map(keys, function(pid) {
@@ -88,13 +89,13 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
                     offers = perPlayer[p.pid].sort(function(a, b) { return b.grade - a.grade; });
                     for (j = 0; j < offers.length; j++ ) {
                         // slightly random passing grade
-                        if (offers[j].grade > random.uniform(0.88, 0.92)) {
+                        if (offers[j].grade > random.uniform(cutoff - 0.02, cutoff + 0.02)) {
                             return freeAgents.acceptContract(p, offers[j], [], tx, (notResign) ? 'freeAgent' : 'reSigned');
                         } else {
                             if (notResign) {
-                                text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign contract with your team, ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[offers[j].tid], g.season]) + '">' + g.teamNamesCache[offers[j].tid] + '</a>.'
+                                text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + helpers.playerNameOvr(p) + '</a> refuses to sign contract with your team, ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[offers[j].tid], g.season]) + '">' + g.teamNamesCache[offers[j].tid] + '</a>.'
                             } else {
-                                text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a> refuses to sign contract to remain on your team, ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[offers[j].tid], g.season]) + '">' + g.teamNamesCache[offers[j].tid] + '</a>.'
+                                text = '<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + helpers.playerNameOvr(p) + '</a> refuses to sign contract to remain on your team, ' + 'the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[offers[j].tid], g.season]) + '">' + g.teamNamesCache[offers[j].tid] + '</a>.'
                             }
                             bbgmNotifications.notify(text, 'Free Agency', true);
                         }
@@ -174,13 +175,14 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
      *
      * @memberOf core.contractNegotiation
      * @param {number} years Annual salary, in thousands of dollars, to be validated.
+     * @param {Objejct} p Player object
      * @return {number} An integer between g.minContract and g.maxContract, rounded to the nearest $10k.
      */
-    function validAmount(amount) {
+    function validAmount(amount, p) {
         if (amount < g.minContract) {
             amount = g.minContract;
-        } else if (amount > g.maxContract) {
-            amount = g.maxContract;
+        } else if (amount > helpers.vetMaxContract(p)) {
+            amount = helpers.vetMaxContract(p);
         }
         return helpers.round(amount / 10) * 10;
     }
@@ -212,9 +214,6 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
      */
     function offer(pid, teamAmount, teamYears) {
         var isResigning, oRosterSize, tx;
-
-        teamAmount = validAmount(teamAmount);
-        teamYears = validYears(teamYears);
 
         // No need to check salary and roster space during resigning period.
         isResigning = g.phase === g.PHASE.RESIGN_PLAYERS;
@@ -257,14 +256,15 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             }
         )
         .then(function(result) {
-            var diffGrade,
+            var cutoff,
+                diffGrade,
                 nego = result.nego,
                 offerGrade,
                 p = result.p,
                 t = result;
 
-            nego.team.amount = teamAmount;
-            nego.team.years = teamYears;
+            nego.team.amount = validAmount(teamAmount, p);
+            nego.team.years = validYears(teamYears);
 
             t.negoTotal += nego.team.amount;
             console.log(t.negoTotal, t.salarySpace, t.rosterSize, teamAmount);
@@ -276,12 +276,13 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             if (!isResigning && (t.salarySpace - t.negoTotal < 0 && teamAmount > g.minContract)) {
                 return 'This contract would put you over the salary cap. You cannot go over the salary cap to sign free agents to contracts higher than the minimum salary. Either negotiate for a lower contract or cancel the negotiation.';
             }
+            cutoff = (g.phase === g.PHASE.RESIGN_PLAYERS) ? freeAgents.OFFER_GRADE_CUTOFF : freeAgents.OFFER_GRADE_CUTOFF_FA;
 
             offerGrade = freeAgents.gradeOffer(negotiationToOffer(nego), p);
-            diffGrade = Math.max(0.9 - offerGrade, 0);
+            diffGrade = Math.max(cutoff - offerGrade, 0);
             // mood only increases (less favorable)
             nego.grade = offerGrade;
-            p.freeAgentMood[nego.tid] += Math.abs(diffGrade) * random.randInt(1, 3) + .05;
+            p.freeAgentMood[nego.tid] += Math.abs(diffGrade) * 0.5 * random.randInt(1, 3) + .05;
             return Promise.join(
                 dao.players.put({ot: tx, value: p}),
                 dao.negotiations.put({ot: tx, value: nego})
