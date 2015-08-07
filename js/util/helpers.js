@@ -898,8 +898,10 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
             }
         } else {
             for(var i=0;i<methods.length;i++){
-                console[methods[i]] = console[methodsTmp[i]];
-                console[methodsTmp[i]] = function(){};
+                if (console[methodsTmp[i]] !== undefined ) {
+                    console[methods[i]] = console[methodsTmp[i]];
+                    console[methodsTmp[i]] = function(){};
+                }
             }
         }
     }

@@ -15,7 +15,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/team", "
             tid: nego.tid,
             pid: nego.pid,
             amount: nego.team.amount,
-            exp: g.season + nego.team.years,
+            exp: g.season + nego.team.years - +(g.phase >= g.PHASE.PRESEASON && g.phase <= g.PHASE.REGULAR_SEASON),
             skill: [],
             signingScore: 0.6,
             grade: nego.grade,

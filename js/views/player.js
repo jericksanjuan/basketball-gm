@@ -36,11 +36,6 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/player", "core/trade", 
                     fuzz: true
                 });
 
-                // Account for extra free agent demands
-                if (p.tid === g.PLAYER.FREE_AGENT) {
-                    p.contract.amount = freeAgents.amountWithMood(p.contract.amount, p.freeAgentMood[g.userTid]);
-                }
-
                 feats = events.filter(function (event) {
                     if (event.type === "playerFeat") {
                         return true;
