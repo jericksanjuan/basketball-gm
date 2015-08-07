@@ -2,7 +2,7 @@
  * @name views.negotiation
  * @namespace Contract negotiation.
  */
-define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core/team", "lib/knockout", "util/bbgmView", "util/helpers", "lib/bluebird"], function (dao, g, ui, contractNegotiation, player, team, ko, bbgmView, helpers, Promise) {
+define(["dao", "globals", "ui", "core/contractNegotiation", "core/freeAgents", "core/player", "core/team", "lib/knockout", "util/bbgmView", "util/helpers", "lib/bluebird"], function (dao, g, ui, contractNegotiation, freeAgents, player, team, ko, bbgmView, helpers, Promise) {
     "use strict";
 
     // Show the negotiations list if there are more ongoing negotiations
@@ -138,6 +138,9 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/player", "core
                 p.gradep = ((p.grade)/100) * 100;
                 p.age = g.season - p.born.year;
                 p.yearsPro = g.season - p.draft.year;
+                p.maxContract = helpers.vetMaxContract(p) / 1000;
+                p.cutoff = (g.phase === g.PHASE.RESIGN_PLAYERS) ? freeAgents.OFFER_GRADE_CUTOFF : freeAgents.OFFER_GRADE_CUTOFF_FA;
+                p.cutoff *= 100;
                 if (p.salaries.length > 0) {
                     p.lastSalary = _.last(p.salaries).amount;
                 } else {

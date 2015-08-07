@@ -9,7 +9,7 @@
     <p>
       Mood: <span data-bind="html: player.mood"></span><br>
       <div class="progress">
-        <div data-bind="attr: { 'aria-valuenow': player.grade(), style: 'width: ' + player.gradep() + '%;' }, css: { 'progress-bar-success': player.grade() > 90, 'progress-bar-warning': player.grade() < 90, 'progress-bar-danger': player.grade() < 50 }" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+        <div data-bind="attr: { 'aria-valuenow': player.grade(), style: 'width: ' + player.gradep() + '%;' }, css: { 'progress-bar-success': player.grade() > player.cutoff(), 'progress-bar-warning': player.grade() < player.cutoff(), 'progress-bar-danger': player.grade() < 50 }" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
         </div>
       </div>
       Overall: <span data-bind="text: player.ratings.ovr"></span> Potential: <span data-bind="text: player.ratings.pot"></span>
@@ -17,6 +17,8 @@
       Age: <span data-bind="text: player.age"></span> Years Pro: <span data-bind="text: player.yearsPro"></span>
       <br/>
       Last Salary: <span data-bind="currency: [player.lastSalary, 'M']"></span>
+      <br>
+      Max Contract: <span data-bind="currency: [player.maxContract, 'M']"></span>
     </p>
       <h3>Player Desired Contract</h3>
       <p><span data-bind="text: negotiation.player.years"></span> years (through <span data-bind="text: negotiation.player.expiration"></span>)</p>

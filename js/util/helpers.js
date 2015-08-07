@@ -4,6 +4,7 @@
  */
 define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko, eventLog) {
     "use strict";
+    var tmpConsole = {};
 
     /**
      * Validate that a given abbreviation corresponds to a team.
@@ -1198,23 +1199,45 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
      * @param  {Boolean} toMute If true no output
      */
     function muteConsole(toMute) {
-        var methods = ["log", "debug", "info"],
+        var i,
+            methods = ["log", "debug", "info"],
             methodsTmp = ["logTmp", "debugTmp", "infoTmp"];
 
         if(!window.console) window.console = {};
         if (toMute) {
-            for(var i=0;i<methods.length;i++){
-                console[methodsTmp[i]] = console[methods[i]];
+            for(i = 0; i < methods.length; i++){
+                tmpConsole[methodsTmp[i]] = console[methods[i]];
                 console[methods[i]] = function(){};
             }
         } else {
-            for(var i=0;i<methods.length;i++){
-                if (console[methodsTmp[i]] !== undefined ) {
-                    console[methods[i]] = console[methodsTmp[i]];
+            for(i = 0; i<methods.length; i++){
+                if (tmpConsole[methodsTmp[i]] !== undefined ) {
+                    console[methods[i]] = tmpConsole[methodsTmp[i]];
                     console[methodsTmp[i]] = function(){};
                 }
             }
         }
+    }
+
+    /**
+     * Returns the max contract allowed for the player based on number
+     * of years as pro.
+     * @param  {Object} p player object
+     * @return {Number}   max contract value
+     */
+    function vetMaxContract(p) {
+        var proExp = g.season - p.draft.year,
+            factor = (proExp <= 5) ? 0.725: (proExp < 10) ? 0.875 : 1;
+        return g.maxContract * factor;
+    }
+
+    /**
+     * Returns player name with ovr
+     * @param  {Object} p player object
+     * @return {String}   the player's name and ovr
+     */
+    function playerNameOvr(p) {
+        return p.name + ' (' + p.ratings[p.ratings.length-1].ovr + ')'
     }
 
     return {
@@ -1254,6 +1277,8 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
         seriesHomeAway: seriesHomeAway,
         multiSort: multiSort,
         correctLinkLid: correctLinkLid,
-        muteConsole: muteConsole
+        muteConsole: muteConsole,
+        vetMaxContract: vetMaxContract,
+        playerNameOvr: playerNameOvr
     };
 });
