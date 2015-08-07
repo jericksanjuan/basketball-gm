@@ -53,13 +53,6 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/league", "core/player",
                     oldStats: true
                 });
 
-                // Add mood to free agent contracts
-                for (i = 0; i < players.length; i++) {
-                    if (players[i].tid === g.PLAYER.FREE_AGENT) {
-                        players[i].contract.amount = freeAgents.amountWithMood(players[i].contract.amount, players[i].freeAgentMood[g.userTid]);
-                    }
-                }
-
                 return {
                     players: players,
                     statType: inputs.statType,
