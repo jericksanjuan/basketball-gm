@@ -304,7 +304,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
         var text,
             userOffered = (g.autoPlaySeasons === 0 && otherTeams.indexOf(g.userTid) > -1);
         tx = dao.tx(["teams", "players"], "readwrite", tx)
-        eventType = eventType || 'freeAgent';
+        eventType = eventType || 'freeAgent',
+        eventText = (eventType === 'freeAgent') ? 'signed' : 're-signed';
         // ^ use to show notification if user offered to player that was signed by another team.
         p.tid = offer.tid;
         p.contract.amount = offer.amount;
@@ -317,7 +318,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
         eventLog.add(null, {
             type: eventType,
-            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> signed <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + helpers.playerNameOvr(p) + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
+            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> ' + eventText + ' <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + helpers.playerNameOvr(p) + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
             showNotification: p.tid === g.userTid,
             pids: [p.pid],
             tids: [p.tid]
