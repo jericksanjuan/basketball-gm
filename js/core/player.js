@@ -135,8 +135,8 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
      * @return {Object.<string, number>} Object containing two properties with integer values, "amount" with the contract amount in thousands of dollars and "exp" with the contract expiration year.
      */
     function genContract(p, randomizeExp, randomizeAmount, noLimit) {
-        var amount, expiration, maxAmount, minAmount, potentialDifference,
-            ratings, years, age, proExp;
+        var amount, age, expiration, maxAmount, minAmount, proExp, potentialDifference,
+            ratings, years;
 
         ratings = _.last(p.ratings);
 
@@ -149,13 +149,13 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         maxAmount = g.maxContract;
 
         // If already a vet, adjust min and max contract based on experience.
+        proExp = g.season - p.draft.year;
         if (p.draft.year < g.season) {
             age = g.season - p.born.year;
-            proExp = g.season - p.draft.year;
 
-            if (proExp <= 6) {
+            if (proExp <= 5) {
                 maxAmount *= 0.725;  // min: 500, max: 14500
-            } else if (proExp >= 7 && proExp <= 9) {
+            } else if (proExp >= 6 && proExp <= 9) {
                 maxAmount *= 0.875;  // max: 17500
             }
         } else {
@@ -189,6 +189,13 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         // limit contract length if over 30
         if  (age > 30) {
             years = Math.min( years , 3);
+        }
+
+        // Choose to set expiration to exact of max contract boundary.
+        if (proExp < 6) {
+            years = (years > 6 - proExp) ? 6 - proExp : years;
+        } else if (proExp < 10) {
+            years = (years > 10 - proExp) ? 10 - proExp : years;
         }
 
         // Randomize expiration for contracts generated at beginning of new game
