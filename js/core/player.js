@@ -156,10 +156,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
             if (proExp <= 6) {
                 maxAmount *= 0.725;  // min: 500, max: 14500
             } else if (proExp >= 7 && proExp <= 9) {
-                minAmount *= 2; // min: 1000
                 maxAmount *= 0.875;  // max: 17500
-            } else if (proExp >= 10) {
-                minAmount *= 3;  // min: 1500, max: 20000
             }
         } else {
             age = p.draft.year - p.born.year
