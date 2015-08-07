@@ -169,7 +169,15 @@ define(["dao", "globals", "ui", "core/finances", "core/team", "lib/jquery", "lib
                             barData[keys[i]] = {};
                             tempData = _.pluck(t.seasons, keys[i]);
                             _.each(tempData[0], function (value, key) {
-                                barData[keys[i]][key] = helpers.nullPad(_.pluck(_.pluck(tempData, key), "amount"), showInt);
+                                var keyValues = _.pluck(tempData, key);
+                                // replace undefined
+                                keyValues = _.map(keyValues, function(v) {
+                                    if (v === undefined) {
+                                        return {amount: 0};
+                                    }
+                                    return v;
+                                })
+                                barData[keys[i]][key] = helpers.nullPad(_.pluck(_.defaults(keyValues, {amount: 0 }), "amount"), showInt);
                             });
                         }
                     }
