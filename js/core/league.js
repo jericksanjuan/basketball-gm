@@ -519,7 +519,10 @@ define(["dao", "db", "globals", "ui", "core/draft", "core/finances", "core/phase
                 return tx.complete().then(function () {
                     if (skipNewPhase) {
                         // Game already in progress, just start it
-                        return g.lid;
+                        return require('core/freeAgents').readyTeamsFA()
+                            .then(function() {
+                                return g.lid;
+                            })
                     }
 
                     // Make schedule, start season
