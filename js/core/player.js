@@ -638,7 +638,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
 
         eventLog.add(null, {
             type: "release",
-            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a>.',
+            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> released <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + helpers.playerNameOvr(p) + '</a>.',
             showNotification: false,
             pids: [p.pid],
             tids: [p.tid]
