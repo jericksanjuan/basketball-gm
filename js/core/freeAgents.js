@@ -281,13 +281,13 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 key: tid
             })
             .then(function (t) {
-                console.log('accepted', g.teamAbbrevsCache[t.tid], t.fa.salarySpace, amount, t.fa.salarySpace - amount, t.fa.rosterSpace);
                 if (!t.hasOwnProperty('fa')) {
                     t.fa = {
                         salarySpace: 0,
                         rosterSpace: 0
                     }
                 }
+                console.log('accepted', g.teamAbbrevsCache[t.tid], t.fa.salarySpace, amount, t.fa.salarySpace - amount, t.fa.rosterSpace);
                 t.fa.salarySpace = Math.max(0, t.fa.salarySpace - amount);
                 t.fa.salarySpace = Math.max(t.fa.salarySpace, g.minContract);
                 t.fa.rosterSpace -= 1;
@@ -305,7 +305,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             userOffered = (g.autoPlaySeasons === 0 && otherTeams.indexOf(g.userTid) > -1);
         tx = dao.tx(["teams", "players"], "readwrite", tx)
         eventType = eventType || 'freeAgent',
-        eventText = (eventType === 'freeAgent') ? 'signed' : 're-signed';
+        text = (eventType === 'freeAgent') ? 'signed' : 're-signed';
         // ^ use to show notification if user offered to player that was signed by another team.
         p.tid = offer.tid;
         p.contract.amount = offer.amount;
@@ -318,7 +318,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
 
         eventLog.add(null, {
             type: eventType,
-            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> ' + eventText + ' <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + helpers.playerNameOvr(p) + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
+            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[p.tid], g.season]) + '">' + g.teamNamesCache[p.tid] + '</a> ' + text + ' <a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + helpers.playerNameOvr(p) + '</a> for ' + helpers.formatCurrency(p.contract.amount / 1000, "M") + '/year through ' + p.contract.exp + '.',
             showNotification: p.tid === g.userTid,
             pids: [p.pid],
             tids: [p.tid]
@@ -644,7 +644,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 index: "tid",
                 key: key
             }).map(function(p) {
-                console.log(p);
                 p.compositeRating = playerComposite(p.ratings);
                 return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
             });
