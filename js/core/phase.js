@@ -310,7 +310,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
         }).then(function () {
             return Promise.all([
                 finances.assessPayrollMinLuxury(tx),
-                season.newSchedulePlayoffsDay(tx)
+                season.newSchedulePlayoffsDay(tx),
+                team.updateCPUTicketPrices(tx, 1.5),
             ]);
         }).then(function () {
             var url;
@@ -452,6 +453,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             });
         }).then(function () {
             return team.updateStrategies(tx);
+        }).then(function() {
+            return team.updateCPUTicketPrices(tx, 0.66);
         }).then(function () {
             return season.updateOwnerMood(tx);
         }).then(function (deltas) {

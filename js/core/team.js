@@ -1341,6 +1341,70 @@ console.log(dv);*/
     }
 
     /**
+     * Update cpu ticket prices after each game.
+     * @param  {Object} t             team object
+     * @param  {Object} teamSeason    team's latest season
+     * @param  {number} att           attendance
+     * @param  {number} ticketRevenue amount for ticket revenue
+     */
+    function updateTicketPrice(t, teamSeason, att, ticketRevenue) {
+        var avg;
+
+        // Do not update player's team.
+        if (t.tid === g.userTid) {
+            return;
+        }
+
+        if (!teamSeason.hasOwnProperty('prevAttendance') || !teamSeason.hasOwnProperty('prevTicketRevenue')) {
+            teamSeason.prevAttendance = [25000, 25000, 25000, 25000, 25000, 25000, 25000, 25000, att + +(att < 25000) * 2500];
+            teamSeason.lowCount = +(att < 25000);
+            teamSeason.prevTicketRevenue = ticketRevenue;
+            teamSeason.totalTicketRevenue = 0;
+        } else {
+            var avg = teamSeason.prevAttendance.reduce(function(a, b) { return a + b;}, 0)/9
+            if (att < avg) {
+                if (teamSeason.lowCount > 1) {
+                    teamSeason.lowCount = 0;
+                    t.budget.ticketPrice.amount *= 0.90;
+                } else {
+                    teamSeason.lowCount += 1;
+                }
+            } else {
+                t.budget.ticketPrice.amount += 1;
+                teamSeason.lowCount = 0;
+            }
+            t.budget.ticketPrice.amount = Math.floor(t.budget.ticketPrice.amount);
+
+            teamSeason.totalTicketRevenue += ticketRevenue
+            // console.log(g.teamAbbrevsCache[t.tid], att, teamSeason.prevAttendance, avg, t.budget.ticketPrice.amount, teamSeason.totalTicketRevenue);
+
+            teamSeason.prevAttendance = teamSeason.prevAttendance.slice(1);
+            teamSeason.prevAttendance.push(Math.min(att + +(att < 25000) * 2500, 25000));
+            teamSeason.prevTicketRevenue = ticketRevenue
+        }
+    }
+
+    /**
+     * Update ticket price for all cpu teams at once.
+     * @param  {IDBTransaction} tx   IndexedDB transaction
+     * @param  {number} mult multiplier
+     */
+    function updateCPUTicketPrices(tx, mult) {
+        tx = dao.tx("teams", "readwrite", tx);
+        return dao.teams.iterate({
+            ot: tx,
+            callback: function(t) {
+                // skip user team
+                if (t.id === g.userTid) {
+                    return;
+                }
+                t.budget.ticketPrice.amount *= mult;
+                return t;
+            }
+        });
+    }
+
+    /**
      * Check roster size limits
      *
      * If any AI team is over the maximum roster size, cut their worst players.
@@ -1458,6 +1522,8 @@ console.log(dv);*/
         filter: filter,
         valueChange: valueChange,
         updateStrategies: updateStrategies,
+        updateTicketPrice: updateTicketPrice,
+        updateCPUTicketPrices: updateCPUTicketPrices,
         checkRosterSizes: checkRosterSizes,
         getPayroll: getPayroll,
         getPayrolls: getPayrolls

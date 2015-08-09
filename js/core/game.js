@@ -84,6 +84,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                 // This doesn't really make sense
                 ticketRevenue = ticketPrice * att / 1000;  // [thousands of dollars]
 
+                team.updateTicketPrice(t, teamSeason, att, ticketRevenue);
+
                 // Hype - relative to the expectations of prior seasons
                 if (teamSeason.gp > 5 && g.phase !== g.PHASE.PLAYOFFS) {
                     winp = teamSeason.won / (teamSeason.won + teamSeason.lost);
@@ -655,7 +657,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                 }
 
                 // Update ranks
-                promises.push(finances.updateRanks(tx, ["expenses", "revenues"]));
+                promises.push(finances.updateRanks(tx, ["expenses", "revenues", "budget"]));
 
                 // Injury countdown - This must be after games are saved, of there is a race condition involving new injury assignment in writeStats
                 promises.push(dao.players.iterate({
