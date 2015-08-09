@@ -6,6 +6,17 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
     "use strict";
 
     /**
+     * Team owner spending types and corresponding max budget allocation.
+     * @type {Object}
+     */
+    var TEAM_OWNER_TYPES = {
+        thrift: 42,
+        below: 52,
+        normal: 62,
+        spender: 72
+    };
+
+    /**
      * Add a new row of season attributes to a team object.
      *
      * There should be one season attributes row for each year, and a new row should be added for each team at the start of a season.
@@ -239,6 +250,18 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         }
         if (!tm.hasOwnProperty("stats")) {
             t = addStatsRow(t);
+        }
+
+        if (tm.hasOwnProperty("ownerMood")) {
+            t.ownerMood = tm.ownerMood;
+        } else {
+            t.ownerMood = {
+                wins: 0,
+                playoffs: 0,
+                money: 0,
+                ownerType: initialOwnerType(t)
+            };
+            t.ownerMood.totalBudget = Math.min(TEAM_OWNER_TYPES[t.ownerMood.ownerType] + random.randInt(0, 5), 72);
         }
 
         return t;
@@ -1553,6 +1576,251 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
     }
 
     /**
+     * Update cpu ticket prices after each game.
+     * @param  {Object} t             team object
+     * @param  {Object} teamSeason    team's latest season
+     * @param  {number} att           attendance
+     * @param  {number} ticketRevenue amount for ticket revenue
+     */
+    function updateTicketPrice(t, teamSeason, att, ticketRevenue) {
+        var avg;
+
+        // Do not update player's team.
+        if (t.tid === g.userTid) {
+            return;
+        }
+
+        if (!teamSeason.hasOwnProperty('prevAttendance') || !teamSeason.hasOwnProperty('prevTicketRevenue')) {
+            teamSeason.prevAttendance = [25000, 25000, 25000, 25000, 25000, 25000, 25000, 25000, att + +(att < 25000) * 2500];
+            teamSeason.lowCount = +(att < 25000);
+            teamSeason.prevTicketRevenue = ticketRevenue;
+            teamSeason.totalTicketRevenue = 0;
+        } else {
+            avg = teamSeason.prevAttendance.reduce(function(a, b) { return a + b;}, 0)/9;
+            if (att < avg) {
+                if (teamSeason.lowCount > 1) {
+                    teamSeason.lowCount = 0;
+                    t.budget.ticketPrice.amount *= 0.90;
+                } else {
+                    teamSeason.lowCount += 1;
+                }
+            } else {
+                t.budget.ticketPrice.amount += 1;
+                teamSeason.lowCount = 0;
+            }
+            t.budget.ticketPrice.amount = Math.floor(t.budget.ticketPrice.amount);
+
+            teamSeason.totalTicketRevenue += ticketRevenue;
+            // console.log(g.teamAbbrevsCache[t.tid], att, teamSeason.prevAttendance, avg, t.budget.ticketPrice.amount, teamSeason.totalTicketRevenue);
+
+            teamSeason.prevAttendance = teamSeason.prevAttendance.slice(1);
+            teamSeason.prevAttendance.push(Math.min(att + +(att < 25000) * 2500, 25000));
+            teamSeason.prevTicketRevenue = ticketRevenue;
+        }
+    }
+
+    /**
+     * Update ticket price for all cpu teams at once.
+     * @param  {IDBTransaction} tx   IndexedDB transaction
+     * @param  {number} mult multiplier
+     */
+    function updateCPUTicketPrices(tx, mult) {
+        tx = dao.tx("teams", "readwrite", tx);
+        return dao.teams.iterate({
+            ot: tx,
+            callback: function(t) {
+                // skip user team
+                if (t.id === g.userTid) {
+                    return;
+                }
+                t.budget.ticketPrice.amount *= mult;
+                t.budget.ticketPrice.amount = Math.floor(t.budget.ticketPrice.amount);
+                return t;
+            }
+        });
+    }
+
+    /**
+     * Check if current user budget exceeds the (new) total budget allowed
+     * If true, update budget allocation.
+     * @param  {Object} budget      user's  team budget
+     * @param  {number} totalBudget total budget value
+     */
+    function checkAndUpdateUserBudget(budget, totalBudget) {
+        var sum;
+        sum = budget.scouting.amount + budget.coaching.amount + budget.health.amount +
+            budget.facilities.amount;
+        sum /= 1000;
+        if (sum > totalBudget) {
+            budget.scouting.amount = +(totalBudget / 4) * 1000;
+            budget.coaching.amount = +(totalBudget / 4) * 1000;
+            budget.health.amount = +(totalBudget / 4) * 1000;
+            budget.facilities.amount = +(totalBudget /4) * 1000;
+        }
+    }
+
+    /**
+     * Update budget allocations for all cpu teams.
+     * @param  {IDBTransaction} tx IndexedDB transaction
+     */
+    function updateCPUBudget(tx) {
+        var informUser = 0;
+        tx = dao.tx("teams", "readwrite", tx);
+        return dao.teams.iterate({
+            ot: tx,
+            callback: function(t) {
+                var amount,
+                    budget,       // team's budget object
+                    i,
+                    priorities,   // priority budget per team based on strategy
+                    ptotal,       // total of priority weights
+                    totalBudget,  // total to allocate on budget
+                    weight;
+                getOwnerMood(t);
+                totalBudget = TEAM_OWNER_TYPES[t.ownerMood.ownerType] + random.randInt(0, 5);
+                totalBudget = Math.min(totalBudget, 72);
+
+                informUser = totalBudget - t.ownerMood.totalBudget;
+
+                t.ownerMood.totalBudget = totalBudget;
+                if (t.tid === g.userTid && g.autoPlaySeasons === 0) {
+                    checkAndUpdateUserBudget(t.budget, totalBudget);
+                    return t;
+                }
+                budget = t.budget;
+                if (t.strategy === 'rebuilding') {
+                    priorities = ['scouting', 'facilities', 'coaching', 'health'];
+                } else {
+                    priorities = ['health', 'facilities', 'coaching', 'scouting'];
+                }
+                weight = 5;
+                ptotal = 14;
+                console.log(g.teamAbbrevsCache[t.tid], t.ownerMood.ownerType, totalBudget, ptotal);
+                for (i = 0; i < priorities.length; i++) {
+                    amount = Math.min(weight/ptotal * totalBudget, 18);
+                    amount = +amount.toFixed(2);
+                    totalBudget -= amount;
+                    budget[priorities[i]].amount = amount * 1000;
+                    ptotal -= weight;
+                    weight--;
+                }
+
+                return t;
+            }
+        }).then(function() {
+            return informUser;
+        })
+    }
+
+    /**
+     * Returns updated owner mood
+     * @param  {Object} t    team
+     * @return {Object}      changes in owner's mood
+     */
+    function getOwnerMood(t) {
+        var deltas, ownerMood, s;
+
+        s = _.last(t.seasons);
+        s.revenue = _.reduce(s.revenues, function (memo, revenue) { return memo + revenue.amount; }, 0);
+        s.expense = _.reduce(s.expenses, function (memo, expense) { return memo + expense.amount; }, 0);
+        s.profit = (s.revenue - s.expense) / 1000;
+
+        deltas = {};
+        deltas.wins = 0.25 * (s.won - 41) / 41;
+        if (s.playoffRoundsWon < 0) {
+            deltas.playoffs = -0.2;
+        } else if (s.playoffRoundsWon < 4) {
+            deltas.playoffs = 0.04 * s.playoffRoundsWon;
+        } else {
+            deltas.playoffs = 0.2;
+        }
+        deltas.money = (s.profit - 15) / 100;
+
+        if(!t.ownerMood) {
+            t.ownerMood = {
+                wins: 0,
+                playoffs: 0,
+                money: 0,
+                ownerType: initialOwnerType(t),
+            };
+            t.ownerMood.totalBudget = Math.min(TEAM_OWNER_TYPES[t.ownerMood.ownerType] + random.randInt(0, 5), 72);
+        }
+
+        if (t.tid === g.userTid && t.ownerMood.wins !== g.ownerMood.wins) {
+            // Transition from using only g for ownerMood.
+            t.ownerMood.wins = g.ownerMood.wins;
+            t.ownerMood.playoffs = g.ownerMood.playoffs;
+            t.ownerMood.money = g.ownerMood.money;
+            t.ownerMood.totalBudget = t.budget.scouting + t.budget.coaching + t.budget.health + t.budget.facilities;
+            t.ownerMood.totalBudget /= 1000;
+        }
+
+        if (t.tid === g.userTid && g.season < g.gracePeriodEnd) {
+            return deltas;
+        }
+
+        t.ownerMood.wins = Math.min(t.ownerMood.wins + deltas.wins, 1);
+        t.ownerMood.playoffs = Math.min(t.ownerMood.playoffs + deltas.playoffs, 1);
+        t.ownerMood.money = Math.min(t.ownerMood.money + deltas.money, 1);
+        t.ownerMood.ownerType = updateOwnerType(t, deltas);
+
+        return deltas;
+    }
+
+    /**
+     * Returns the initial owner type for a team based on population and cash.
+     * @param  {Object} t team
+     * @return {String}   owner type
+     */
+    function initialOwnerType(t) {
+        var s = _.last(t.seasons);
+        if(s.cash < 0) {
+            return 'thrift';
+        }
+
+        if(s.pop > 10) {
+            return random.choice(["spender", "normal"]);
+        } else if(s.pop >= 5 && s.pop < 10) {
+            return random.choice(["spender", "normal", "below"]);
+        } else if(s.pop >= 2.5 && s.pop < 5) {
+            return random.choice(["normal", "below", "thrift"]);
+        } else {
+            return random.choice(['below', 'thrift']);
+        }
+    }
+
+    /**
+     * Get updated owner type based on season
+     * @param  {Object} t      team object
+     * @param  {Object} deltas season results
+     * @return {String}        team owner type
+     */
+    function updateOwnerType(t, deltas) {
+        var changes,
+            keys = _.keys(TEAM_OWNER_TYPES),
+            sum = t.ownerMood.wins + t.ownerMood.playoffs + t.ownerMood.money,
+            teamSeason = _.last(t.seasons);
+
+        changes = keys.indexOf(t.ownerMood.ownerType);
+        // Returns thrift.
+        if (sum < -1 || teamSeason.cash < 0) {
+            return 'thrift';
+        }
+
+        console.log(g.teamAbbrevsCache[t.tid], 'prev ownerType', changes);
+        changes += (deltas.money < 0) ? -0.3 : 0.3;
+        changes += (deltas.wins < 0) ? -0.3: 0.3;
+        changes += (deltas.playoffs < 0) ? -0.3 : 0.3;
+        // team population divided by league average population plus random factor
+        changes += Math.min((teamSeason.pop / 4.6), 3) * 0.25 + random.uniform(0, 0.10);
+
+        changes = helpers.bound(Math.floor(changes), 0, keys.length-1);
+
+        console.log(g.teamAbbrevsCache[t.tid], 'new ownerType', changes);
+        return keys[changes];
+    }
+
+    /**
      * Check roster size limits
      *
      * If any AI team is over the maximum roster size, cut their worst players.
@@ -1728,9 +1996,13 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
         filter: filter,
         valueChange: valueChange,
         updateStrategies: updateStrategies,
+        updateTicketPrice: updateTicketPrice,
+        updateCPUTicketPrices: updateCPUTicketPrices,
+        updateCPUBudget: updateCPUBudget,
         checkRosterSizes: checkRosterSizes,
         getPayroll: getPayroll,
         getPayrolls: getPayrolls,
-        allRostersAutoSort: allRostersAutoSort
+        allRostersAutoSort: allRostersAutoSort,
+        getOwnerMood: getOwnerMood
     };
 });

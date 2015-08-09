@@ -16,44 +16,15 @@ define(["dao", "globals", "core/player", "core/team", "lib/bluebird", "lib/under
      * @return {Promise.Object} Resolves to an object containing the changes in g.ownerMood this season.
      */
     function updateOwnerMood(tx) {
-        return team.filter({
+        return dao.teams.get({
             ot: tx,
-            seasonAttrs: ["won", "playoffRoundsWon", "profit"],
-            season: g.season,
-            tid: g.userTid
-        }).then(function (t) {
-            var deltas, ownerMood;
-
-            deltas = {};
-            deltas.wins = 0.25 * (t.won - 41) / 41;
-            if (t.playoffRoundsWon < 0) {
-                deltas.playoffs = -0.2;
-            } else if (t.playoffRoundsWon < 4) {
-                deltas.playoffs = 0.04 * t.playoffRoundsWon;
-            } else {
-                deltas.playoffs = 0.2;
-            }
-            deltas.money = (t.profit - 15) / 100;
-
-            return Promise.try(function () {
-                // Only update owner mood if grace period is over
-                if (g.season >= g.gracePeriodEnd) {
-                    ownerMood = {};
-                    ownerMood.wins = g.ownerMood.wins + deltas.wins;
-                    ownerMood.playoffs = g.ownerMood.playoffs + deltas.playoffs;
-                    ownerMood.money = g.ownerMood.money + deltas.money;
-
-                    // Bound only the top - can't win the game by doing only one thing, but you can lose it by neglecting one thing
-                    if (ownerMood.wins > 1) { ownerMood.wins = 1; }
-                    if (ownerMood.playoffs > 1) { ownerMood.playoffs = 1; }
-                    if (ownerMood.money > 1) { ownerMood.money = 1; }
-
-                    return require("core/league").setGameAttributes(tx, {ownerMood: ownerMood});
-                }
-            }).then(function () {
-                return deltas;
+            key: g.userTid
+        })
+            .then(function(t) {
+                var deltas = team.getOwnerMood(t);
+                return require('core/league').setGameAttributes(tx, {ownerMood: t.ownerMood})
+                    .thenReturn(deltas);
             });
-        });
     }
 
     /**

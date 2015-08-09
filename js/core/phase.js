@@ -183,7 +183,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             .then(function () {
                 return Promise.all([
                     finances.assessPayrollMinLuxury(tx),
-                    season.newSchedulePlayoffsDay(tx)
+                    season.newSchedulePlayoffsDay(tx),
+                    team.updateCPUTicketPrices(tx, 1.5)
                 ]);
             }).then(function () {
                 var url;
@@ -333,6 +334,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             });
         }).then(function () {
             return team.updateStrategies(tx);
+        }).then(function() {
+            return team.updateCPUTicketPrices(tx, 0.66);
         }).then(function () {
             return season.updateOwnerMood(tx);
         }).then(function (deltas) {
@@ -415,7 +418,16 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             }
         }
 
-        return Promise.all(promises).then(function () {
+        return Promise.all(promises)
+        .then(function() {
+            return team.updateCPUBudget(tx);
+        }).then(function(informUser) {
+            if (informUser !== 0) {
+                message.budgetChanged(tx, 1);
+            }
+        }).then(function() {
+            return finances.updateRanks(tx, ["budget"]);
+        }).then(function () {
             return [undefined, ["playerMovement"]];
         });
     }
@@ -555,7 +567,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         return newPhaseDraft(phaseChangeTx);
                     }
                     if (phase === g.PHASE.AFTER_DRAFT) {
-                        phaseChangeTx = dao.tx(["draftPicks", "gameAttributes"], "readwrite");
+                        phaseChangeTx = dao.tx(["draftPicks", "gameAttributes", "teams", "messages"], "readwrite");
                         return newPhaseAfterDraft(phaseChangeTx);
                     }
                     if (phase === g.PHASE.RESIGN_PLAYERS) {
