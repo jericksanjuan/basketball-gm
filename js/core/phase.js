@@ -540,6 +540,10 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
         return Promise.all(promises)
         .then(function() {
             return team.updateCPUBudget(tx);
+        }).then(function(informUser) {
+            if (informUser !== 0) {
+                message.budgetChanged(tx, 1);
+            }
         }).then(function() {
             return finances.updateRanks(tx, ["budget"]);
         }).then(function () {
@@ -764,7 +768,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         return newPhaseDraft(phaseChangeTx);
                     }
                     if (phase === g.PHASE.AFTER_DRAFT) {
-                        phaseChangeTx = dao.tx(["draftPicks", "gameAttributes", "teams"], "readwrite");
+                        phaseChangeTx = dao.tx(["draftPicks", "gameAttributes", "teams", "messages"], "readwrite");
                         return newPhaseAfterDraft(phaseChangeTx);
                     }
                     if (phase === g.PHASE.RESIGN_PLAYERS) {

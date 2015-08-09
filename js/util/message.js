@@ -263,7 +263,27 @@ define(["dao", "globals", "lib/bluebird", "util/helpers", "util/random"], functi
         });
     }
 
+    function budgetChanged(tx, informUser) {
+        var text;
+        if (informUser > 0) {
+            text = "<p>P.S. I love the direction of the team and would like to see what you can do with more. I'm increasing your budget allocation starting this year. Please do well.</p>";
+        } else {
+            text = "<p>P.S. I need to cut on some my losses so I'm decreasing your budget from today. I still fully expect you to bring out the best product on the league, be resourceful and work it out.</p>";
+        }
+        tx = dao.tx("messages", "readwrite", tx)
+        return dao.messages.add({
+            ot: tx,
+            value: {
+                read: false,
+                from: "The Owner",
+                year: g.season,
+                text: text
+            }
+        });
+    }
+
     return {
-        generate: generate
+        generate: generate,
+        budgetChanged
     };
 });

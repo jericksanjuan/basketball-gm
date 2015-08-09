@@ -1452,6 +1452,7 @@ console.log(dv);*/
      * @param  {IDBTransaction} tx IndexedDB transaction
      */
     function updateCPUBudget(tx) {
+        var informUser = 0;
         tx = dao.tx("teams", "readwrite", tx);
         return dao.teams.iterate({
             ot: tx,
@@ -1466,6 +1467,9 @@ console.log(dv);*/
                 getOwnerMood(t);
                 totalBudget = TEAM_OWNER_TYPES[t.ownerMood.ownerType] + random.randInt(0, 5);
                 totalBudget = Math.min(totalBudget, 72);
+
+                informUser = totalBudget - t.ownerMood.totalBudget;
+
                 t.ownerMood.totalBudget = totalBudget;
                 if (t.tid === g.userTid && g.autoPlaySeasons === 0) {
                     checkAndUpdateUserBudget(t.budget, totalBudget);
@@ -1491,7 +1495,9 @@ console.log(dv);*/
 
                 return t;
             }
-        });
+        }).then(function() {
+            return informUser;
+        })
     }
 
     /**
