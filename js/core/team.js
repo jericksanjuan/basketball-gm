@@ -1539,6 +1539,8 @@ console.log(dv);*/
             t.ownerMood.wins = g.ownerMood.wins;
             t.ownerMood.playoffs = g.ownerMood.playoffs;
             t.ownerMood.money = g.ownerMood.money;
+            t.ownerMood.totalBudget = t.budget.scouting + t.budget.coaching + t.budget.health + t.budget.facilities;
+            t.ownerMood.totalBudget /= 1000;
         }
 
         if (t.tid === g.userTid && g.season < g.gracePeriodEnd) {

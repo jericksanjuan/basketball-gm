@@ -48,10 +48,15 @@ define(["dao", "globals", "ui", "core/finances", "core/team", "lib/jquery", "lib
 
         tx = dao.tx("teams", "readwrite");
         dao.teams.get({ot: tx, key: g.userTid}).then(function (t) {
-            var budget, key;
+            var budget, budgetSum, key, totalBudget;
 
             budget = req.params.budget;
+            totalBudget = 72;
+            if (t.ownerMood) {
+                totalBudget = t.ownerMood.totalBudget;
+            }
 
+            budgetSum = 0;
             for (key in budget) {
                 if (budget.hasOwnProperty(key)) {
                     if (key === "ticketPrice") {
@@ -60,14 +65,20 @@ define(["dao", "globals", "ui", "core/finances", "core/team", "lib/jquery", "lib
                     } else {
                         // Convert from [millions of dollars] to [thousands of dollars] rounded to the nearest $10k
                         budget[key] = helpers.round(budget[key] * 100) * 10;
+                        budgetSum += budget[key];
                     }
                     if (budget[key] === budget[key]) { // NaN check
                         t.budget[key].amount = budget[key];
                     }
                 }
             }
+            budgetSum /= 1000;
+            if (budgetSum > totalBudget) {
 
-            return dao.teams.put({ot: tx, value: t});
+                helpers.errorNotify("The " + budgetSum + "M you have set is over your allowed budget allocation of " + totalBudget + "M set by your owner.");
+            } else {
+                return dao.teams.put({ot: tx, value: t});
+            }
         }).then(function () {
             return finances.updateRanks(tx, ["budget"]);
         }).then(function () {
@@ -169,7 +180,16 @@ define(["dao", "globals", "ui", "core/finances", "core/team", "lib/jquery", "lib
                             barData[keys[i]] = {};
                             tempData = _.pluck(t.seasons, keys[i]);
                             _.each(tempData[0], function (value, key) {
-                                barData[keys[i]][key] = helpers.nullPad(_.pluck(_.pluck(tempData, key), "amount"), showInt);
+                                var keyValues = _.pluck(tempData, key);
+                                // replace undefined
+                                keyValues = _.map(keyValues, function(v) {
+                                    if (v === undefined) {
+                                        return {amount: 0};
+                                    }
+                                    return v;
+                                })
+                                barData[keys[i]][key] = helpers.nullPad(_.pluck(_.defaults(keyValues, {amount: 0 }), "amount"), showInt);
+                                // barData[keys[i]][key] = helpers.nullPad(_.pluck(_.pluck(tempData, key), "amount"), showInt);
                             });
                         }
                     }
@@ -200,7 +220,7 @@ define(["dao", "globals", "ui", "core/finances", "core/team", "lib/jquery", "lib
             }).then(function () {
                 // Get stuff for the finances form
                 return team.filter({
-                    attrs: ["region", "name", "abbrev", "budget"],
+                    attrs: ["region", "name", "abbrev", "budget", "ownerMood", 'test'],
                     seasonAttrs: ["expenses", "payroll"],
                     season: g.season,
                     tid: inputs.tid
