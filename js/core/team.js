@@ -257,6 +257,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                 money: 0,
                 ownerType: initialOwnerType(t)
             };
+            t.ownerMood.totalBudget = Math.min(TEAM_OWNER_TYPES[t.ownerMood.ownerType] + random.randInt(0, 5), 72);
         }
 
         return t;
@@ -1428,6 +1429,25 @@ console.log(dv);*/
     }
 
     /**
+     * Check if current user budget exceeds the (new) total budget allowed
+     * If true, update budget allocation.
+     * @param  {Object} budget      user's  team budget
+     * @param  {number} totalBudget total budget value
+     */
+    function checkAndUpdateUserBudget(budget, totalBudget) {
+        var sum;
+        sum = budget.scouting.amount + budget.coaching.amount + budget.health.amount +
+            budget.facilities.amount;
+        sum /= 1000;
+        if (sum > totalBudget) {
+            budget.scouting.amount = +(totalBudget / 4) * 1000;
+            budget.coaching.amount = +(totalBudget / 4) * 1000;
+            budget.health.amount = +(totalBudget / 4) * 1000;
+            budget.facilities.amount = +(totalBudget /4) * 1000;
+        }
+    }
+
+    /**
      * Update budget allocations for all cpu teams.
      * @param  {IDBTransaction} tx IndexedDB transaction
      */
@@ -1444,19 +1464,21 @@ console.log(dv);*/
                     totalBudget,  // total to allocate on budget
                     weight;
                 getOwnerMood(t);
-                if (t.tid === g.userTid && g.autoPlaySeasons === 0) {
-                    return t;
-                }
                 totalBudget = TEAM_OWNER_TYPES[t.ownerMood.ownerType] + random.randInt(0, 5);
                 totalBudget = Math.min(totalBudget, 72);
+                t.ownerMood.totalBudget = totalBudget;
+                if (t.tid === g.userTid && g.autoPlaySeasons === 0) {
+                    checkAndUpdateUserBudget(t.budget, totalBudget);
+                    return t;
+                }
                 budget = t.budget;
                 if (t.strategy === 'rebuilding') {
                     priorities = ['scouting', 'facilities', 'coaching', 'health'];
                 } else {
                     priorities = ['health', 'facilities', 'coaching', 'scouting'];
                 }
-                weight = 5
-                ptotal = 14
+                weight = 5;
+                ptotal = 14;
                 console.log(g.teamAbbrevsCache[t.tid], t.ownerMood.ownerType, totalBudget, ptotal);
                 for (i = 0; i < priorities.length; i++) {
                     amount = Math.min(weight/ptotal * totalBudget, 18);
@@ -1481,6 +1503,9 @@ console.log(dv);*/
         var deltas, ownerMood, s;
 
         s = _.last(t.seasons);
+        s.revenue = _.reduce(s.revenues, function (memo, revenue) { return memo + revenue.amount; }, 0);
+        s.expense = _.reduce(s.expenses, function (memo, expense) { return memo + expense.amount; }, 0);
+        s.profit = (s.revenue - s.expense) / 1000;
 
         deltas = {};
         deltas.wins = 0.25 * (s.won - 41) / 41;
@@ -1498,14 +1523,15 @@ console.log(dv);*/
                 wins: 0,
                 playoffs: 0,
                 money: 0,
-                ownerType: initialOwnerType(t)
+                ownerType: initialOwnerType(t),
             };
+            t.ownerMood.totalBudget = Math.min(TEAM_OWNER_TYPES[t.ownerMood.ownerType] + random.randInt(0, 5), 72);
         }
 
         if (t.tid === g.userTid && t.ownerMood.wins !== g.ownerMood.wins) {
             // Transition from using only g for ownerMood.
             t.ownerMood.wins = g.ownerMood.wins;
-            t.ownerMood.playoffs = g.ownerMood.wins;
+            t.ownerMood.playoffs = g.ownerMood.playoffs;
             t.ownerMood.money = g.ownerMood.money;
         }
 
