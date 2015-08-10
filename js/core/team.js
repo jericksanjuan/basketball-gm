@@ -1630,7 +1630,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
             ot: tx,
             callback: function(t) {
                 // skip user team
-                if (t.id === g.userTid) {
+                if (t.id === g.userTid && g.autoPlaySeasons === 0) {
                     return;
                 }
                 t.budget.ticketPrice.amount *= mult;
