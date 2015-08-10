@@ -488,7 +488,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
             dao.players.getAll({ot: ot, index: "tid", key: tid}),
             dao.teams.get({ot: ot, key: tid})
         ]).spread(function (players, team) {
-            var i, j, k, numPlayers, p, pos, rating, t, teamSeason;
+            var finances, i, j, k, numPlayers, p, pos, rating, t, teamSeason;
 
             players.sort(function (a, b) { return a.rosterOrder - b.rosterOrder; });
 
@@ -583,10 +583,11 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
             t.stat = {min: 0, fg: 0, fga: 0, fgAtRim: 0, fgaAtRim: 0, fgLowPost: 0, fgaLowPost: 0, fgMidRange: 0, fgaMidRange: 0, tp: 0, tpa: 0, ft: 0, fta: 0, orb: 0, drb: 0, ast: 0, tov: 0, stl: 0, blk: 0, ba: 0, pf: 0, pts: 0, ptsQtrs: [0]};
 
             if (forFA) {
+                finances = require("core/finances");
                 t.team = team;
-                t.scoutingRank = teamSeason.expenses.scouting.rank;
-                t.coachingRank = teamSeason.expenses.coaching.rank;
-                t.facilitiesRank = teamSeason.expenses.facilities.rank;
+                t.scoutingRank = require("core/finances").getRankLastThree(team, "expenses", "scouting");;
+                t.coachingRank = require("core/finances").getRankLastThree(team, "expenses", "coaching");
+                t.facilitiesRank = require("core/finances").getRankLastThree(team, "expenses", "facilities");
             }
 
             return t;

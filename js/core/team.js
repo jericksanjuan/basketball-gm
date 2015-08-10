@@ -1340,7 +1340,7 @@ console.log(dv);*/
                     }
 
 
-                    scoutingRank = t.seasons[s].expenses.scouting.rank;
+                    scoutingRank = require("core/finances").getRankLastThree(t, "expenses", "scouting");
                     // assign fuzz value for this season
                     t.fuzzValue = player.genFuzz(scoutingRank);
                     updated = true;
