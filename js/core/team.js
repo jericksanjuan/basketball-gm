@@ -1562,7 +1562,7 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                     }
 
 
-                    scoutingRank = t.seasons[s].expenses.scouting.rank;
+                    scoutingRank = require("core/finances").getRankLastThree(t, "expenses", "scouting");
                     // assign fuzz value for this season
                     t.fuzzValue = player.genFuzz(scoutingRank);
                     updated = true;
