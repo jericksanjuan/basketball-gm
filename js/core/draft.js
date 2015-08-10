@@ -73,7 +73,7 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
 
             for (i = 0; i < numPlayers; i++) {
                 baseRating = Math.floor(helpers.bound(random.realGauss(21, 11), 15, 70))
-                pot = Math.floor(helpers.bound(random.realGauss(48, 17), baseRating, 90));
+                pot = Math.floor(helpers.bound(random.realGauss(52, 17), baseRating, 100));
 
                 profile = profiles[random.randInt(0, profiles.length - 1)];
                 agingYears = Math.floor(helpers.bound(random.realGauss(2, 1), 0, 3));

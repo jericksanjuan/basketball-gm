@@ -428,7 +428,7 @@ define(["dao", "db", "globals", "ui", "core/draft", "core/finances", "core/phase
                         for (var i =0; i<14; i++) {
                             var br, pr;
                             br = Math.floor(helpers.bound(random.realGauss(31, 11), 26, 70))
-                            pr = Math.floor(helpers.bound(random.realGauss(48, 17), 26, 90))
+                            pr = Math.floor(helpers.bound(random.realGauss(52, 17), 26, 100))
                             baseRatings.push(br);
                             pots.push(pr)
                         }

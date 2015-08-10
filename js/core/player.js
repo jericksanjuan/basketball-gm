@@ -376,6 +376,8 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
             // Noise
             if (age <= 25) {
                 val += helpers.bound(random.realGauss(0, 5), -4, 10);
+            } else if (age <=31) {
+                val += helpers.bound(random.realGauss(0.5, 2), -1, 3);
             } else {
                 val += helpers.bound(random.realGauss(0, 3), -2, 10);
             }
@@ -388,14 +390,12 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
 
             // Randomly make a big jump
             if (Math.random() > 0.985 && age <= 23) {
-                var val = helpers.bound(random.realGauss(8, 8), 5, 25);
-                p.ratings[r].pot += val;
+                p.ratings[r].pot += random.uniform(5, 25);
             }
 
             // Randomly regress
             if (Math.random() > 0.995 && age <= 23) {
-                var val = helpers.bound(random.realGauss(8, 8), 5, 25);
-                p.ratings[r].pot -= val;
+                p.ratings[r].pot -= random.uniform(5, 25);
             }
 
             baseChange = calcBaseChange(age, p.ratings[r].pot - p.ratings[r].ovr);
