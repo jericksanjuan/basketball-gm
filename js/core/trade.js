@@ -786,26 +786,56 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
 
     }
 
+    function getAssetValue(asset) {
+        var age, v, values;
+        values = {
+            80: 100,
+            70: 80,
+            60: 25,
+            50: 10,
+        };
+        if (asset.hasOwnProperty('round')) {
+            if (asset.season === g.season) {
+                return (asset.round === 1) ? 45 : 15;
+            } else {
+                return (asset.round === 1) ? 40 : 10;
+            }
+
+            return value;
+        } else {
+            age = asset.born.year - g.season;
+            v = helpers.bound(Math.floor(asset.value / 10), 50, 80);
+            v = values[v];
+            if (age < 25) {
+                return  v * 0.95;
+            } else if (age >= 25 && age <= 29) {
+                return v;
+            } else {
+                return v * 0.9;
+            }
+        }
+    }
+
     function setTradeablePids(players, offers, tmInfo) {
         var pids = players.filter(function(p) {
                 return p.gamesUntilTradable === 0;
             }),
-            fnSort,
-            remaining;
+            fnSort;
         if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS) {
             return;
         }
+        pids = pids.map(function(p) {
+            p.playerGrade = gradePlayer(p);
+            return p;
+        });
         fnSort = function(a, b) {
-            var r = Math.ceil(a.value) - Math.ceil(b.value);
+            var r = a.playerGrade - b.playerGrade;
             r = (r === 0) ? b.contract.amount - a.contract.amount : r;
             return (r === 0) ? b.born.year - a.born.year : r;
         };
-        console.log(tmInfo.isTaxPaying);
+
+        // taxpaying team reduce salary.
         if (tmInfo.isTaxPaying) {
-            pids = pids.map(function(p) {
-                p.playerGrade = gradePlayer(p);
-                return p;
-            });
             pids = pids.filter(function(p) {
                 return p.contract.exp !== g.season &&
                     p.contract.amount <= tmInfo.luxuryTax &&
@@ -816,85 +846,87 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 var r;
                 r = a.playerGrade - b.playerGrade;
                 r = (r === 0) ? a.contract.amount - b.contract.amount : r;
-                r = (r === 0) ? Math.ceil(a.value) - Math.ceil(b.value) : r;
                 return (r === 0) ? b.born.year - a.born.year : r;
             });
 
             if (pids.length > 0) {
                 offers.pids.push(pids[0].pid);
                 offers.expiring += pids[0].contract.amount;
-                offers.value = pids[0].value;
+                offers.value = getAssetValue(pids[0]);
                 return;
             }
         }
 
+        // rebuilding team trade non-expiring for expiring
         if (tmInfo.isRebuilding && tmInfo.salarySpace < g.salaryCap - g.minPayroll) {
             pids = pids.filter(function(p) {
                 return p.contract.exp !== g.season &&
                     p.contract.amount > g.maxContract * 0.25 &&
-                    gradePlayer(p) < 0.6;
+                    p.playerGrade < 0.6;
             });
             pids.sort(fnSort);
 
             if (pids.length > 0) {
                 offers.pids.push(pids[0].pid);
-                offers.expiring += pids[0].contract.amount;
-                offers.value = pids[0].value;
+                offers.value = getAssetValue(pids[0]);
                 return;
             }
         }
 
+        // contending team  trade expiring
         if (!tmInfo.isRebuilding && tmInfo.expiring.amount > 0 ) {
             // Trade expiring contracts (in chance to get assets in return)
             pids = pids.filter(function(p) {
                 return p.contract.exp === g.season &&
                     p.contract.amount > g.maxContract * 0.25 &&
-                    gradePlayer < 0.6;
+                    p.playerGrade < 0.6;
             });
             pids.sort(fnSort);
 
             if (pids.length > 0) {
                 offers.pids.push(pids[0].pid);
                 offers.expiring += pids[0].contract.amount;
-                offers.value = pids[0].value;
+                offers.value = getAssetValue(pids[0]);
                 return;
             }
         }
 
-        // if team is losing a lot, try to trade higher valued players.
-        // shake things up by trading a key player (lowest PER).
+        // If team is losing, shake things up, trade a valuable player
+        if (tmInfo.games.gp > 41 && tmInfo.games.winp < 0.55 && tmInfo.games.hype < 0.25) {
+            if (tmInfo.games.won3 / (tmInfo.games.gp3 || 1) < 0.55) {
+                console.log('shaking things up');
+                pids = pids.filter(function(p) {
+                    return p.contract.amount > g.maxContract * 0.25 &&
+                        (p.playerGrade > 0.7 && p.playerGrade < 0.9);
+                });
+                pids.sort(fnSort);
 
-        // Trade lowest valued player on team.
-        // pids.sort(fnSort);
-        // if (pids.length > 0) {
-        //     offers.pids.push(pids[0].pid);
-        //     offers.value = pids[0].value;
-        // }
+                if (pids.length > 0) {
+                    offers.pids.push(pids[0].pid);
+                    offers.value = getAssetValue(pids[0]);
+                    return;
+                }
+            }
+        }
     }
 
-    /**
-     * Some rules
-     * 1. Draft picks should only be on trading block after regular season
-     * 2. Draft picks are rarely put up on trading block, only on special cases.
-     *    a. over luxury tax && rosterSpace - expiring
-     * 3. Multiple secound round picks.
-     */
     function setTradeableDpids(draftPicks, offers, tmInfo) {
-        var cond1, cond2, dpids;
-        if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS || offers.pids.length > 0) {
+        var cond1, cond2, dpids, year;
+        if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS ||
+                offers.pids.length > 0 ||
+                tmInfo.games.gp < 41 ) {
             return;
         }
         cond1 = tmInfo.isTaxPaying && 15 - tmInfo.expiring.count < 2;
         cond2 = tmInfo.salarySpace > g.salaryCap - g.minPayroll && offers.rosterSpace > 0;
         if (cond1 || cond2) {
+            year = (tmInfo.games.winp < 0.55) ? g.season + require("util/random").randInt(1, 3): g.season;
             dpids = draftPicks.filter(function(dp) {
-                // if we have losing record this season, offer next year's pick
-                return dp.season === g.season && dp.round === 2;
+                return dp.season === year && dp.round === 2;
             });
-            console.log(JSON.stringify(dpids));
             if (dpids.length > 0) {
                 offers.dpids.push(dpids[0].dpid);
-                offers.value = 10;
+                offers.value = getAssetValue(dpids[0]);
             }
         }
     }
@@ -905,7 +937,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             "readwrite", tx);
 
         getTeamOffers = function(t, players, draftPicks, payroll) {
-            var expDeals, info, offers, s;
+            var expDeals, info, offers, s, s3;
 
             offers = {
                 tid: t.tid,
@@ -916,15 +948,18 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 expiring: 0,   // amount of expiring deals
                 value: 0       // value of main trade asset
             };
+
             if (t.tid === g.userTid && g.autoPlaySeasons === 0) {
                 t.offers = offers;
                 return dao.teams.put({ot: tx, value: t});
             }
 
             s = _.last(t.seasons);
+            s3 = t.seasons.slice(-3, -1);
             expDeals = payroll[1].filter(function(c) {
                 return c.exp === g.season;
             });
+
             info = {
                 isRebuilding: t.strategy === "rebuilding",
                 salarySpace: offers.salarySpace,
@@ -934,16 +969,20 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 expiring: {
                     amount: expDeals.reduce(function(a, b) {return a + b.amount;}, 0),
                     count: expDeals.length
+                },
+                games: {
+                    winp: s.won / s.gp,
+                    gp: s.gp,
+                    hype: s.hype,
+                    won3: s3.reduce(function(a, b) {return a + b.won;}, 0) || 1,
+                    gp3: s3.reduce(function(a, b) {return a + b.gp;}, 0) || 1
                 }
             };
+
             setTradeablePids(players, offers, info);
             setTradeableDpids(draftPicks, offers, info);
-            if (offers.pids.length || offers.dpids.length) {
-                t.offers = offers;
-            } else {
-                t.offers = offers;
-            }
-            console.log(g.teamAbbrevsCache[t.tid], offers);
+            t.offers = offers;
+            console.log(g.teamAbbrevsCache[t.tid], offers, offers.value);
             return dao.teams.put({ot: tx, value: t});
         };
 
