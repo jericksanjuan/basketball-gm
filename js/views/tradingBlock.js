@@ -181,22 +181,25 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/b
         if (updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("tradingBlockAsk") >= 0) {
             offers = [];
 
-            if (inputs.offers.length === 0) {
-                return {
-                    offers: offers
-                };
-            }
-
             tx = dao.tx(["players", "playerStats", "draftPicks", "teams"]);
 
             return team.filter({
-                attrs: ["abbrev", "region", "name", "strategy"],
+                attrs: ["abbrev", "region", "name", "strategy", "offers"],
                 seasonAttrs: ["won", "lost"],
                 season: g.season,
                 ot: tx
             }).then(function (teams) {
                 var i, promises;
 
+                inputs.offers = _.pluck(teams, "offers").filter(function(o) {
+                    return o.tid !== g.userTid && o.pids.length || o.dpids.length;
+                });
+
+                if (inputs.offers.length === 0) {
+                    return {
+                        offers: offers
+                    };
+                }
                 promises = [];
 
                 // Take the pids and dpids in each offer and get the info needed to display the offer
@@ -216,7 +219,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/b
                             lost: teams[tid].lost,
                             pids: inputs.offers[i].pids,
                             dpids: inputs.offers[i].dpids,
-                            warning: inputs.offers[i].warning
+                            warning: inputs.offers[i].warning,
+                            salarySpace: inputs.offers[i].salarySpace / 1000,
+                            rosterSpace: inputs.offers[i].rosterSpace
                         };
 
                         promises.push(dao.players.getAll({
@@ -247,7 +252,6 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/b
                             key: tid
                         }).then(function (picks) {
                             var j;
-
                             picks = picks.filter(function (dp) { return inputs.offers[i].dpids.indexOf(dp.dpid) >= 0; });
                             for (j = 0; j < picks.length; j++) {
                                 picks[j].desc = helpers.pickDesc(picks[j]);
