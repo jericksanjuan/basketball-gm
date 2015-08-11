@@ -916,7 +916,7 @@ define(["dao", "globals", "lib/knockout", "util/eventLog"], function (dao, g, ko
      */
     function vetMaxContract(p) {
         var proExp = g.season - p.draft.year,
-            factor = (proExp <= 5) ? 0.725: (proExp < 10) ? 0.875 : 1;
+            factor = (proExp <= 4) ? 0.725: (proExp < 8) ? 0.875 : 1;
         return g.maxContract * factor;
     }
 
