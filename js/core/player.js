@@ -153,9 +153,9 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         if (p.draft.year < g.season) {
             age = g.season - p.born.year;
 
-            if (proExp <= 5) {
+            if (proExp <= 4) {
                 maxAmount *= 0.725;  // min: 500, max: 14500
-            } else if (proExp >= 6 && proExp <= 9) {
+            } else if (proExp >= 5 && proExp <= 7) {
                 maxAmount *= 0.875;  // max: 17500
             }
         } else {
@@ -192,10 +192,10 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         }
 
         // Choose to set expiration to exact of max contract boundary.
-        if (proExp < 6) {
-            years = (years > 6 - proExp) ? 6 - proExp : years;
-        } else if (proExp < 10) {
-            years = (years > 10 - proExp) ? 10 - proExp : years;
+        if (proExp < 5) {
+            years = (years > 5 - proExp) ? 5 - proExp : years;
+        } else if (proExp < 8) {
+            years = (years > 8 - proExp) ? 8 - proExp : years;
         }
 
         // Randomize expiration for contracts generated at beginning of new game
