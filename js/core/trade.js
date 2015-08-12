@@ -735,11 +735,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 if (!found) {
                     return g.teamRegionsCache[teams0[1].tid] + ' GM: "I can\'t afford to give up so much."';
                 }
-                console.log(JSON.stringify(teams));
                 return summary(teams).then(function (s) {
                     var i, updated;
-                    console.log(JSON.stringify(teams0));
-                    console.log(JSON.stringify(teams));
 
                     // Store AI's proposed trade in database, if it's different
                     updated = false;
@@ -858,7 +855,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             players = _.filter(players, function(p) {
                 return p.gamesUntilTradable === 0;
             });
-
             draftPicks = _.flatten(draftPicks);
 
             tradeNego = _.sortBy(tradeNego, 'value').reverse();
@@ -866,32 +862,27 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             result = (tradeNego[1].value / tradeNego[0].value) || 0;
             console.log(tradeNego, result);
 
-
-            if (g.userTid === tradeNego[0].tid && (tradeNego[0].value > 0 || tradeNego[1].value > 0)) {
-                console.log('exit 1');
+            if (g.userTid === tradeNego[0].tid && tradeNego[0].value > 0) {
                 return [true, tradeNego];
             }
 
             if (result < tradeNego[0].reqValue || result === NaN) {
                 if (tradeNego[1].pids.length + tradeNego[1].dpids.length > 4) {
                     console.log(JSON.stringify(tradeNego), false);
-                    return [false, tradeNego];
+                    return [false];
                 } else {
                     origValue = Math.min(origValue, tradeNego[0].value);
                 }
 
-                players = _.map(players, function(p) {
-                    p.tradeValue = getAssetValue(p);
-                    return p;
-                });
-                draftPicks = _.map(draftPicks, function(dp) {
-                    dp.tradeValue = getAssetValue(dp);
-                    return dp;
-                });
-
-                assets = _.flatten(_.union(players, draftPicks)).filter(function(p) {
+                assets = _.flatten(
+                    _.union(players, draftPicks)
+                )
+                .filter(function(p) {
                     var cond = (p.hasOwnProperty('round')) ? tradeDpids.indexOf(p.dpid) === -1 : tradePids.indexOf(p.pid) === -1;
                     return cond && p.tid === tradeNego[1].tid;
+                }).map(function(p) {
+                    p.tradeValue = getAssetValue(p);
+                    return p;
                 });
 
                 players = _.object(_.pluck(players, "pid"), players);
@@ -901,12 +892,13 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                     tradeNego[i].value = assessTradeAssets(tradeNego[i], players, draftPicks);
                 }
                 assets = assets.filter(function(p) {
+                    // Only add player of lesser trade value.
                     return p.tradeValue < tradeNego[0].value;
-                })
-                assets = assets.filter(function(p) {
+                }).filter(function(p) {
                     if (p.hasOwnProperty('round')) {
                         return true;
                     } else {
+                        // Don't add more players if other team has no roster space.
                         if (tradeNego[0].rosterSpace + tradeNego[0].pids.length <= tradeNego[1].pids.length) {
                             return;
                         }
@@ -914,13 +906,14 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                     }
                 });
 
-                if (tradeNego[0].value - tradeNego[1].value <= 5) {
+                // If difference in value is small, add smaller value asset.
+                if (tradeNego[0].value - tradeNego[1].value <= 0) {
+                    assets = [];
+                } else if (tradeNego[0].value - tradeNego[1].value <= 5) {
                     assets = _.sortBy(assets, 'tradeValue');
                 } else {
                     assets = _.sortBy(assets, 'tradeValue').reverse();
                 }
-                console.log('assets', JSON.stringify(assets));
-
 
                 if (assets.length > 0) {
                     if(assets[0].hasOwnProperty('round')) {
@@ -931,10 +924,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                         tradeNego[1].pids.push(assets[0].pid);
                         tradeNego[1].contract += assets[0].contract.amount;
                     }
-                    console.log('adding', JSON.stringify(tradeNego));
-                    console.log(assets[0]);
-                    console.log(players);
-                    console.log(draftPicks);
+
                     for (i = 0; i < tradeNego.length; i++) {
                         tradeNego[i].value = assessTradeAssets(tradeNego[i], players, draftPicks);
                     }
@@ -1015,20 +1005,21 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             70: 80,
             60: 25,
             50: 10,
+            40: 1,
         };
         if (asset.hasOwnProperty('round')) {
             if (asset.season === g.season) {
                 console.log('draft asset', asset);
                 // TODO: set value of this years pick based on record.
-                return (asset.round === 1) ? 30 : 7.5;
+                return (asset.round === 1) ? 30 : 15;
             } else {
-                return (asset.round === 1) ? 20 : 5;
+                return (asset.round === 1) ? 26 : 11;
             }
 
             return value;
         } else {
             age = g.season - asset.born.year;
-            v = helpers.bound(Math.floor(asset.value / 10) * 10, 50, 80);
+            v = helpers.bound(Math.floor(asset.value / 10) * 10, 40, 80);
             v = values[v] + asset.value/100 * 10;
 
             if (age < 21) {
