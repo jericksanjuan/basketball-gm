@@ -878,7 +878,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 offers.value = getAssetValue(pids[0]);
                 return;
             }
-        }
+        };
 
         fnRebuilding = function() {
             pids = pidsOrig.filter(function(p) {
@@ -893,7 +893,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 offers.value = getAssetValue(pids[0]);
                 return;
             }
-        }
+        };
 
         fnContending = function() {
             // Trade expiring contracts (in chance to get assets in return)
@@ -910,7 +910,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 offers.value = getAssetValue(pids[0]);
                 return;
             }
-        }
+        };
 
         fnLosing = function() {
             if (tmInfo.games.won3 / tmInfo.games.gp3 < 0.55) {
@@ -927,7 +927,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                     return;
                 }
             }
-        }
+        };
 
         // taxpaying team reduce salary.
         if (tmInfo.isTaxPaying) {
@@ -971,10 +971,11 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         }
     }
 
-    function updateTradingBlock(tx) {
-        var getTeamOffers, updateTeamOffers;
+    function updateTradingBlock(tx, initialize) {
+        var getTeamOffers, teamTradingSkip, updateTeamOffers;
         tx = dao.tx(["teams", "players", "playerStats", "draftPicks", "releasedPlayers"],
             "readwrite", tx);
+        initialize = initialize || false;
 
         getTeamOffers = function(t, players, draftPicks, payroll) {
             var expDeals, info, offers, s, s3;
@@ -1004,6 +1005,11 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         };
 
         updateTeamOffers = function(tid) {
+            if (teamTradingSkip[tid] > 0 && !initialize) {
+                teamTradingSkip[tid]--;
+                return;
+            }
+
             return Promise.join(
                 dao.teams.get({
                     ot: tx,
@@ -1021,9 +1027,25 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 }),
                 team.getPayroll(tx, tid),
                 getTeamOffers
-            );
+            )
+            .then(function() {
+                teamTradingSkip[tid] = random.randInt(0, 90);
+            });
         };
-        return Promise.map(_.range(30), updateTeamOffers);
+
+        if (!localStorage.teamTradingSkip) {
+            teamTradingSkip = _.range(30).map(function() {
+                return random.randInt(0, 90);
+            });
+            localStorage.teamTradingSkip = JSON.stringify(teamTradingSkip);
+        } else {
+            teamTradingSkip = JSON.parse(localStorage.teamTradingSkip);
+        }
+
+        return Promise.map(_.range(30), updateTeamOffers)
+            .then(function() {
+                localStorage.teamTradingSkip = JSON.stringify(teamTradingSkip);
+            });
     }
 
     function getTeamTradingInfo(t, payroll) {
