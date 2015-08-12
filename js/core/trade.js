@@ -782,6 +782,131 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         });
     }
 
+    function doTrade(tx, tradeNego) {
+        tx = dao.tx(["teams", "players", "playerStats", "draftPicks", "releasedPlayers"],
+            "readwrite", tx);
+    }
+
+    /**
+     * tradeNego: [offer1, offer2]
+     */
+    function evaluateTrade(tx, tradeNego) {
+        var fnEvaluateTrade, fnGetPlayers, fnGetDraftPicks, tids;
+        tx = dao.tx(["teams", "players", "playerStats", "draftPicks", "releasedPlayers"],
+            "readwrite", tx);
+
+        fnGetPlayers = function(tid) {
+            return dao.players.getAll({
+                ot: tx,
+                index: "tid",
+                key: tid
+            });
+        };
+
+        fnGetDraftPicks = function(tid) {
+            return dao.draftPicks.getAll({
+                ot: tx,
+                index: "tid",
+                key: tid
+            });
+        };
+
+        fnEvaluateTrade = function(players, draftPicks, tradeNego, reverse, origValue) {
+            var assets, i, result, tradeDpids, tradePids;
+            reverse = reverse || true;
+            tradePids = _.flatten(_.pluck(tradeNego, 'pids'));
+            tradeDpids = _.flatten(_.pluck(tradeNego, 'dpids'));
+
+            players = _.flatten(players);
+            players = _.filter(players, function(p) {
+                return p.gamesUntilTradable === 0;
+            });
+
+            draftPicks = _.flatten(draftPicks);
+
+            tradeNego = _.sortBy(tradeNego, 'value').reverse();
+            if (origValue < tradeNego[0].value) {
+                console.log(JSON.stringify(tradeNego), false);
+                return;
+            } else {
+                origValue = Math.min(origValue, tradeNego[0].value);
+            }
+
+            result = tradeNego[1].value / tradeNego[0].value;
+
+            // Different criteria for accepting trade
+            // If trade[0] is trading for salarySpace no need to match tradeValue (accept pick or low rank player)
+            // If trade[0] is trading for expiry no need
+            // [value, salarySpace, expiry]
+
+            if (result < tradeNego[0].reqValue) {
+                players = _.map(players, function(p) {
+                    p.tradeValue = getAssetValue(p);
+                    return p;
+                });
+                draftPicks = _.map(draftPicks, function(dp) {
+                    dp.tradeValue = getAssetValue(dp);
+                    return dp;
+                })
+
+                assets = _.flatten(_.union(players, draftPicks)).filter(function(p) {
+                    return (p.hasOwnProperty('round')) ? tradeDpids.indexOf(p.dpid) === -1 :
+                        tradePids.indexOf(p.pid) === -1 &&
+                        p.tradeValue < tradeNego[0].value;
+                });
+                if (reverse) {
+                    assets = _.sortBy(assets, 'tradeValue');
+                } else {
+                    assets = _.sortBy(assets, 'tradeValue').reverse();
+                }
+
+                players = _.object(_.pluck(players, "pid"), players);
+                draftPicks = _.object(_.pluck(draftPicks, "dpid"), draftPicks);
+
+                if (assets.length > 0) {
+                    if(assets[0].hasOwnProperty('round')) {
+                        tradeNego[1].dpids = tradeNego[1].dpids || []
+                        tradeNego[1].dpids.push(assets[0].dpid);
+                    } else {
+                        tradeNego[1].pids = tradeNego[1].pids || []
+                        tradeNego[1].pids.push(assets[0].pid);
+                        tradeNego[1].contract += assets[0].contract.amount;
+                    }
+                    console.log('adding', JSON.stringify(tradeNego));
+                    console.log(assets[0]);
+                    console.log(players);
+                    console.log(draftPicks);
+                    for (i = 0; i < tradeNego.length; i++) {
+                        tradeNego[i].value = assessTradeAssets(tradeNego[i], players, draftPicks)
+                    }
+                    return fnEvaluateTrade(players, draftPicks, tradeNego, !reverse, origValue);
+                }
+            } else {
+                console.log(JSON.stringify(tradeNego), true);
+            }
+        };
+
+        tids = _.pluck(tradeNego, "tid");
+        return Promise.join(
+            Promise.map(tids, fnGetPlayers),
+            Promise.map(tids, fnGetDraftPicks),
+            tradeNego,
+            false,
+            200,
+            fnEvaluateTrade
+        );
+    }
+
+    function testEvaluateTrade() {
+        return dao.teams.getAll()
+            .then(function(teams) {
+                var tradeNego;
+                random.shuffle(teams);
+                tradeNego = [teams[0].offers, teams[1].offers];
+                evaluateTrade(null, tradeNego);
+            });
+    }
+
     // players and draftPicks must be objects with their respective ids as keys.
     function assessTradeAssets(offer, players, draftPicks) {
         var i,out, value, values;
@@ -794,6 +919,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             value = getAssetValue(draftPicks[offer.dpids[i]]);
             values.push(value);
         }
+
+        out = 0;
         values = values.sort(function(a, b){ return b - a;});
         for (i = 0; i < values.length; i++) {
             out += values[i] / (i + 1);
@@ -830,6 +957,17 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 return v * 0.9;
             }
         }
+    }
+
+    function updateLocalTeamRankings(tid) {
+        // get all teams, store standing
+        // store on localStorage
+    }
+
+    function getDraftPickValue(draftPick) {
+        // If order is already set use that instead of rankings.
+        // 1 - 1/30 * 10 (first pick is 100%)
+        // Future picks ^value * 1 + 0.2 * (pick.season - g.season)/4.
     }
 
     function setTradeablePids(players, offers, tmInfo) {
@@ -876,6 +1014,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 offers.pids.push(pids[0].pid);
                 offers.expiring += pids[0].contract.amount;
                 offers.value = getAssetValue(pids[0]);
+                offers.contract += pids[0].contract.amount;
+                offers.priority = ["salarySpace", "expiring", "value"]
                 return;
             }
         };
@@ -891,6 +1031,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             if (pids.length > 0) {
                 offers.pids.push(pids[0].pid);
                 offers.value = getAssetValue(pids[0]);
+                offers.contract += pids[0].contract.amount;
+                offers.priority = ["salarySpace", "expiring", "value"];
                 return;
             }
         };
@@ -908,6 +1050,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 offers.pids.push(pids[0].pid);
                 offers.expiring += pids[0].contract.amount;
                 offers.value = getAssetValue(pids[0]);
+                offers.contract += pids[0].contract.amount;
                 return;
             }
         };
@@ -924,6 +1067,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 if (pids.length > 0) {
                     offers.pids.push(pids[0].pid);
                     offers.value = getAssetValue(pids[0]);
+                    offers.contract += pids[0].contract.amount;
                     return;
                 }
             }
@@ -986,8 +1130,11 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 dpids: [],
                 salarySpace: Math.max(g.salaryCap - payroll[0], 0),
                 rosterSpace: 15 - players.length,
-                expiring: 0,   // amount of expiring deals
-                value: 0       // value of main trade asset
+                expiring: 0,                       // amount of expiring deals
+                value: 0,                          // value of main trade asset
+                reqValue: random.uniform(0.55, 1),  // percentage of value that must be met before an offer is accepted.
+                contract: 0,
+                priority: ["value"]
             };
 
             if (t.tid === g.userTid && g.autoPlaySeasons === 0) {
@@ -1155,6 +1302,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         makeItWorkTrade: makeItWorkTrade,
         filterUntradable: filterUntradable,
         getPickValues: getPickValues,
-        updateTradingBlock: updateTradingBlock
+        updateTradingBlock: updateTradingBlock,
+        evaluateTrade: evaluateTrade,
+        testEvaluateTrade: testEvaluateTrade
     };
 });
