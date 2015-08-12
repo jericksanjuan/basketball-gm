@@ -381,12 +381,12 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
 
                 outcome = "rejected"; // Default
 
-                return team.valueChange(teams[1].tid, teams[0].pids, teams[1].pids, teams[0].dpids, teams[1].dpids, null).then(function (dv) {
+                // return team.valueChange(teams[1].tid, teams[0].pids, teams[1].pids, teams[0].dpids, teams[1].dpids, null).then(function (dv) {
+                return callEvaluateTrade(null, teams, true).then(function (dv) {
                     var formatAssetsEventLog, tx;
 
                     tx = dao.tx(["draftPicks", "players", "playerStats"], "readwrite");
-
-                    if (dv > 0 || forceTrade) {
+                    if (dv && dv || forceTrade) {
                         // Trade players
                         outcome = "accepted";
                         [0, 1].forEach(function (j) {
@@ -790,8 +790,9 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
     /**
      * Convert from trade format to tradeNego
      */
-    function callEvaluateTrade(tx, tradeTeams) {
+    function callEvaluateTrade(tx, tradeTeams, firstResult) {
         var order;
+        firstResult = firstResult || false;
         tx = dao.tx(["teams"], "readwrite", tx);
         return Promise.map(tradeTeams, function(t) {
             return dao.teams.get({
@@ -806,10 +807,14 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 tradeNego[i].dpids = tradeTeams[i].dpids;
             }
             order = _.pluck(tradeTeams, "tid");
+            if (firstResult) {
+                return  evaluateTrade(null, tradeNego, firstResult);
+            }
             return evaluateTrade(null, tradeNego)
         }).then(function(result) {
             var tmp;
-            if (result[0]) {
+            // order result similar to first call.
+            if (result[0] && !firstResult) {
                 if (order[0] !== result[1][0].tid) {
                     tmp = result[1][0];
                     result[1][0] = result[1][1];
@@ -844,8 +849,9 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             });
         };
 
-        fnEvaluateTrade = function(players, draftPicks, tradeNego, origValue) {
+        fnEvaluateTrade = function(players, draftPicks, tradeNego, firstResult) {
             var assets, i, result, tradeDpids, tradePids;
+            firstResult = firstResult || false;
             tradePids = _.flatten(_.pluck(tradeNego, 'pids'));
             tradeDpids = _.flatten(_.pluck(tradeNego, 'dpids'));
 
@@ -868,8 +874,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 if (tradeNego[1].pids.length + tradeNego[1].dpids.length > 4) {
                     console.log(JSON.stringify(tradeNego), false);
                     return [false];
-                } else {
-                    origValue = Math.min(origValue, tradeNego[0].value);
                 }
 
                 assets = _.flatten(
@@ -889,6 +893,12 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 for (i = 0; i < tradeNego.length; i++) {
                     tradeNego[i].value = assessTradeAssets(tradeNego[i], players, draftPicks);
                 }
+
+                if (firstResult) {
+                    result = (tradeNego[1].value / tradeNego[0].value) || 0;
+                    return [result < tradeNego[0].reqValue];
+                }
+
                 assets = assets.filter(function(p) {
                     // Only add player of lesser trade value.
                     return p.tradeValue < tradeNego[0].value;
@@ -926,13 +936,17 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                     for (i = 0; i < tradeNego.length; i++) {
                         tradeNego[i].value = assessTradeAssets(tradeNego[i], players, draftPicks);
                     }
-                    return fnEvaluateTrade(players, draftPicks, tradeNego, origValue);
+                    return fnEvaluateTrade(players, draftPicks, tradeNego);
                 }
             }
 
+            for (i = 0; i < tradeNego.length; i++) {
+                if (!tradeNego[i].pids.length && !tradeNego[i].dpids.length) {
+                    return [false];
+                }
+            }
             console.log(JSON.stringify(tradeNego), true);
             return [true, tradeNego];
-
         };
 
         tids = _.pluck(tradeNego, "tid");
@@ -940,7 +954,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             Promise.map(tids, fnGetPlayers),
             Promise.map(tids, fnGetDraftPicks),
             tradeNego,
-            200,
             fnEvaluateTrade
         );
     }
