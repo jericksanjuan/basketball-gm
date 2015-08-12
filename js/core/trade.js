@@ -806,7 +806,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 tradeNego[i].dpids = tradeTeams[i].dpids;
             }
             order = _.pluck(tradeTeams, "tid");
-            console.log("order", order);
             return evaluateTrade(null, tradeNego)
         }).then(function(result) {
             var tmp;
@@ -817,7 +816,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                     result[1][1] = tmp;
                 }
             }
-            console.log("output", JSON.stringify(result));
             return result;
         });
     }
@@ -1009,7 +1007,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         };
         if (asset.hasOwnProperty('round')) {
             if (asset.season === g.season) {
-                console.log('draft asset', asset);
                 // TODO: set value of this years pick based on record.
                 return (asset.round === 1) ? 30 : 15;
             } else {
