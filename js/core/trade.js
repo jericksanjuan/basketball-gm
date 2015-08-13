@@ -708,7 +708,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                     }).then(function (p) {
                         p.tid = tids[k];
                         // Don't make traded players untradable
-                        //p.gamesUntilTradable = 15;
+                        p.gamesUntilTradable = 40;
                         p.ptModifier = 1; // Reset
                         if (g.phase <= g.PHASE.PLAYOFFS) {
                             p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
@@ -1004,15 +1004,17 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         ts = teams.slice(0);
 
         if (finder.offers.priority[0] === "value") {
-            ts  = teams.sort(function(a, b) {
+            ts  = ts.sort(function(a, b) {
                 return b.offers.value - a.offers.value;
             });
         } else {
-            ts = teams.sort(function(a, b) {
+            ts = ts.sort(function(a, b) {
                 var r = b.offers.salarySpace - a.offers.salarySpace;
                 return (r === 0) ? b.offers.expiring - a.offers.expiring : r;
             });
         }
+        ts = ts.slice(0, 5);
+        random.shuffle(ts);
         if (ts[0].tid === finder.tid) {
             return ts[1];
         }
@@ -1211,12 +1213,12 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         };
 
         // taxpaying team reduce salary.
-        if (tmInfo.isTaxPaying) {
+        if (tmInfo.isTaxPaying && tmInfo.games.gp > 20 && tmInfo.games.winp < 0.25 ) {
             return fnTaxPaying();
         }
 
         // rebuilding team trade non-expiring for expiring
-        if (tmInfo.isRebuilding && tmInfo.salarySpace < g.salaryCap - g.minPayroll) {
+        if (tmInfo.isRebuilding && tmInfo.salarySpace < g.salaryCap - g.minPayroll && tmInfo.games.gp > 20) {
             return fnRebuilding();
         }
 
@@ -1327,13 +1329,13 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 getTeamOffers
             )
             .then(function() {
-                teamTradingSkip[tid] = random.randInt(0, 90);
+                teamTradingSkip[tid] = random.randInt(0, 45);
             });
         };
 
         if (!localStorage.teamTradingSkip) {
             teamTradingSkip = _.range(30).map(function() {
-                return random.randInt(0, 90);
+                return random.randInt(0, 45);
             });
             localStorage.teamTradingSkip = JSON.stringify(teamTradingSkip);
         } else {
@@ -1380,59 +1382,69 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         tx = dao.tx(["teams", "players", "releasedPlayers", "draftPicks"], "readwrite", tx);
 
         return dao.teams.getAll()
-            .then(function(teams) {
-                var i, result, tids, tmp, tradeNego;
-                random.shuffle(teams);
-                tradeNego = [teams[0].offers, matchTradeTeams(teams[0], teams).offers];
-                return evaluateTrade(null, tradeNego)
-                    .then(function(result) {
-                        if (result[0]) {
-                            // switch up order
-                            tmp = result[1][0];
-                            result[1][0] = result[1][1];
-                            result[1][1] = tmp;
+        .then(function(teams) {
+            var i, result, tids, tmp, tradeNego;
+            if (g.autoPlaySeasons === 0) {
+                teams = teams.filter(function(t) {
+                    return t.tid !== g.userTid;
+                })
+            }
+            random.shuffle(teams);
+            tradeNego = [teams[0].offers, matchTradeTeams(teams[0], teams).offers];
+            return evaluateTrade(null, tradeNego)
+                .then(function(result) {
+                    if (result[0]) {
+                        // switch up order
+                        tmp = result[1][0];
+                        result[1][0] = result[1][1];
+                        result[1][1] = tmp;
 
-                            return Promise.join(
-                                result[0],
-                                result[1],
-                                summary(tradeNego),
-                                doTrade
-                            ).then(function(tradeResult) {
-                                if (tradeResult[0]) {
-                                    console.log("cpu trade successful");
-                                    tids = _.pluck(result[1], 'tid');
+                        return Promise.join(
+                            result[0],
+                            result[1],
+                            summary(tradeNego),
+                            doTrade
+                        ).then(function(tradeResult) {
+                            if (tradeResult[0]) {
+                                tids = _.pluck(result[1], 'tid');
+                                console.log("cpu trade success", g.teamAbbrevsCache[tids[0]], g.teamAbbrevsCache[tids[1]]);
 
-                                    updateTradingBlock(null, true, tids, true);
-                                } else {
-                                    console.log('trade failed');
-                                }
-                            });
-                        }
-                    });
-            });
+                                updateTradingBlock(null, true, tids, true);
+                            } else {
+                                console.log('trade failed');
+                            }
+                        });
+                    }
+                });
+        });
     }
 
     function initiateTrades(tx) {
         tx = dao.tx(["teams", "players", "releasedPlayers", "draftPicks"], "readwrite", tx);
 
         doCPUTrade(tx);
-        localStorage.skipTrading = 0 //random.randInt(0, 10);
+        localStorage.skipTrading = 0 //random.randInt(0, 5);
     }
 
     function tickCpuTradingDay(tx) {
+        if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS) {
+            return;
+        }
+
         tx = dao.tx(["teams", "players", "releasedPlayers", "draftPicks"], "readwrite", tx);
 
-        updateTradingBlock(tx);
+        return updateTradingBlock(tx)
+            .then(function() {
+                if (!localStorage.skipTrading) {
+                    localStorage.skipTrading = random.randInt(0, 10);
+                }
 
-        if (!localStorage.skipTrading) {
-            localStorage.skipTrading = random.randInt(0, 10);
-        }
-
-        if (localStorage.skipTrading > 0) {
-            localStorage.skipTrading--;
-        } else {
-            initiateTrades(tx);
-        }
+                if (localStorage.skipTrading > 0) {
+                    localStorage.skipTrading--;
+                } else {
+                    return initiateTrades(tx);
+                }
+            });
     }
 
     /** Erase later on */

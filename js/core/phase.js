@@ -106,7 +106,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
         return dao.teams.getAll({ot: tx}).then(function (teams) {
             return season.setSchedule(tx, season.newSchedule(teams));
         }).then(function () {
-            require('core/trade').updateTradingBlock(null, true);
+            require('core/trade').updateTradingBlock(null, true, null, true);
         }).then(function () {
             // First message from owner
             if (g.showFirstOwnerMessage) {
