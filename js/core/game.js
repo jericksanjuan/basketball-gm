@@ -836,6 +836,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                                     // Decrease free agent demands and let AI teams sign them
                                     return freeAgents.decreaseDemands().then(freeAgents.autoSign);
                                 }
+                            }).then(function () {
+                                return require('core/trade').tickCpuTradingDay();
                             }).then(cbPlayGames);
                         });
                     }
@@ -875,6 +877,7 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
     }
 
     return {
-        play: play
+        play: play,
+        makeComposite: makeComposite
     };
 });

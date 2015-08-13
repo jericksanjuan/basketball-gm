@@ -675,10 +675,11 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
 
     function doTrade(dv, teams, s, forceTrade) {
         var dpids, formatAssetsEventLog, outcome, pids, tids, tx;
-
+        console.log('doing trade');
         forceTrade = forceTrade || false;
 
         if (s.warning && !forceTrade) {
+            console.log(s.warning);
             return [false, null];
         }
 
@@ -1018,16 +1019,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         return ts[0];
     }
 
-    function testEvaluateTrade() {
-        return dao.teams.getAll()
-            .then(function(teams) {
-                var tradeNego;
-                random.shuffle(teams);
-                tradeNego = [teams[0].offers, matchTradeTeams(teams[0], teams).offers];
-                evaluateTrade(null, tradeNego);
-            });
-    }
-
     // players and draftPicks must be objects with their respective ids as keys.
     function assessTradeAssets(offer, players, draftPicks, expOnly) {
         var i, isProtected, maxVal, out, p, value, values;
@@ -1265,11 +1256,13 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         }
     }
 
-    function updateTradingBlock(tx, initialize) {
+    function updateTradingBlock(tx, initialize, tids, empty) {
         var getTeamOffers, teamTradingSkip, updateTeamOffers;
         tx = dao.tx(["teams", "players", "playerStats", "draftPicks", "releasedPlayers"],
             "readwrite", tx);
         initialize = initialize || false;
+        tids = tids || _.range(30);
+        empty = empty || false;
 
         getTeamOffers = function(t, players, draftPicks, payroll) {
             var expDeals, info, offers, s, s3;
@@ -1300,9 +1293,10 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 return dao.teams.put({ot: tx, value: t});
             }
 
-
-            setTradeablePids(players, offers, info);
-            setTradeableDpids(draftPicks, offers, info);
+            if (!empty) {
+                setTradeablePids(players, offers, info);
+                setTradeableDpids(draftPicks, offers, info);
+            }
             t.offers = offers;
             console.log(g.teamAbbrevsCache[t.tid], offers, offers.value);
             return dao.teams.put({ot: tx, value: t});
@@ -1346,7 +1340,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             teamTradingSkip = JSON.parse(localStorage.teamTradingSkip);
         }
 
-        return Promise.map(_.range(30), updateTeamOffers)
+        return Promise.map(tids, updateTeamOffers)
             .then(function() {
                 localStorage.teamTradingSkip = JSON.stringify(teamTradingSkip);
             });
@@ -1382,14 +1376,54 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         return info;
     }
 
-    function tickCpuTradingDay(tx) {
+    function doCPUTrade(tx) {
         tx = dao.tx(["teams", "players", "releasedPlayers", "draftPicks"], "readwrite", tx);
 
-        // update skipTrading
-        // localStorage.skipTrading = random.randInt(0, 10);
+        return dao.teams.getAll()
+            .then(function(teams) {
+                var i, result, tids, tmp, tradeNego;
+                random.shuffle(teams);
+                tradeNego = [teams[0].offers, matchTradeTeams(teams[0], teams).offers];
+                return evaluateTrade(null, tradeNego)
+                    .then(function(result) {
+                        if (result[0]) {
+                            // switch up order
+                            tmp = result[1][0];
+                            result[1][0] = result[1][1];
+                            result[1][1] = tmp;
+
+                            return Promise.join(
+                                result[0],
+                                result[1],
+                                summary(tradeNego),
+                                doTrade
+                            ).then(function(tradeResult) {
+                                if (tradeResult[0]) {
+                                    console.log("cpu trade successful");
+                                    tids = _.pluck(result[1], 'tid');
+
+                                    updateTradingBlock(null, true, tids, true);
+                                } else {
+                                    console.log('trade failed');
+                                }
+                            });
+                        }
+                    });
+            });
     }
 
     function initiateTrades(tx) {
+        tx = dao.tx(["teams", "players", "releasedPlayers", "draftPicks"], "readwrite", tx);
+
+        doCPUTrade(tx);
+        localStorage.skipTrading = 0 //random.randInt(0, 10);
+    }
+
+    function tickCpuTradingDay(tx) {
+        tx = dao.tx(["teams", "players", "releasedPlayers", "draftPicks"], "readwrite", tx);
+
+        updateTradingBlock(tx);
+
         if (!localStorage.skipTrading) {
             localStorage.skipTrading = random.randInt(0, 10);
         }
@@ -1397,7 +1431,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         if (localStorage.skipTrading > 0) {
             localStorage.skipTrading--;
         } else {
-            tickCpuTradingDay(tx);
+            initiateTrades(tx);
         }
     }
 
@@ -1461,6 +1495,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         getPickValues: getPickValues,
         updateTradingBlock: updateTradingBlock,
         evaluateTrade: evaluateTrade,
-        testEvaluateTrade: testEvaluateTrade
+        tickCpuTradingDay: tickCpuTradingDay,
     };
 });
