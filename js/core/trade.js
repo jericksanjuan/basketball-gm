@@ -810,7 +810,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             if (firstResult) {
                 return  evaluateTrade(null, tradeNego, firstResult);
             }
-            return evaluateTrade(null, tradeNego)
+            return evaluateTrade(null, tradeNego);
         }).then(function(result) {
             var tmp;
             // order result similar to first call.
@@ -829,7 +829,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
      * tradeNego: [offer1, offer2]
      */
     function evaluateTrade(tx, tradeNego) {
-        var fnEvaluateTrade, fnGetPlayers, fnGetDraftPicks, tids;
+        var fnEvaluateTrade, fnGetPlayers, fnGetDraftPicks, fnUpdateTradeValue, tids;
         tx = dao.tx(["teams", "players", "playerStats", "draftPicks", "releasedPlayers"],
             "readwrite", tx);
 
@@ -849,8 +849,22 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             });
         };
 
+        fnUpdateTradeValue = function(tradeNego, players, draftPicks) {
+            var i;
+            for (i = 0; i < tradeNego.length; i++) {
+                    tradeNego[i].value = assessTradeAssets(tradeNego[i], players, draftPicks);
+                }
+                // Remove protection on asset if maxVal of other is higher.
+                for  (i = 0; i < tradeNego.length; i++) {
+                    if (tradeNego[i].isProtected && (tradeNego[i].maxValue < tradeNego[1-i].maxValue)) {
+
+                        tradeNego[i].value /= 1000;
+                    }
+                }
+        };
+
         fnEvaluateTrade = function(players, draftPicks, tradeNego, firstResult) {
-            var assets, i, result, tradeDpids, tradePids;
+            var assets, i, result, tradeDpids, tradePids, v;
             firstResult = firstResult || false;
             tradePids = _.flatten(_.pluck(tradeNego, 'pids'));
             tradeDpids = _.flatten(_.pluck(tradeNego, 'dpids'));
@@ -870,7 +884,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 return [true, tradeNego];
             }
 
-            if (result < tradeNego[0].reqValue || result === NaN) {
+            if (result < tradeNego[0].reqValue || isNaN(result)) {
                 if (tradeNego[1].pids.length + tradeNego[1].dpids.length > 4) {
                     console.log(JSON.stringify(tradeNego), false);
                     return [false];
@@ -887,12 +901,20 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                     return p;
                 });
 
+                if (tradeNego[0].priority[0] === "salarySpace") {
+                    assets = assets.filter(function(p) {
+                        if (p.hasOwnProperty('pid')) {
+                            return p.contract.exp === g.season;
+                        } else {
+                            return p;
+                        }
+                    });
+                }
+
                 players = _.object(_.pluck(players, "pid"), players);
                 draftPicks = _.object(_.pluck(draftPicks, "dpid"), draftPicks);
 
-                for (i = 0; i < tradeNego.length; i++) {
-                    tradeNego[i].value = assessTradeAssets(tradeNego[i], players, draftPicks);
-                }
+                fnUpdateTradeValue(tradeNego, players, draftPicks);
 
                 if (firstResult) {
                     result = (tradeNego[1].value / tradeNego[0].value) || 0;
@@ -933,9 +955,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                         tradeNego[1].contract += assets[0].contract.amount;
                     }
 
-                    for (i = 0; i < tradeNego.length; i++) {
-                        tradeNego[i].value = assessTradeAssets(tradeNego[i], players, draftPicks);
-                    }
+                    fnUpdateTradeValue(tradeNego, players, draftPicks);
                     return fnEvaluateTrade(players, draftPicks, tradeNego);
                 }
             }
@@ -945,8 +965,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                     return [false];
                 }
             }
-            console.log(JSON.stringify(tradeNego), true);
-            return [true, tradeNego];
+            console.log(JSON.stringify(tradeNego), result >= tradeNego[0].reqValue);
+            return [result >= tradeNego[0].reqValue, tradeNego];
         };
 
         tids = _.pluck(tradeNego, "tid");
@@ -990,11 +1010,15 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
 
     // players and draftPicks must be objects with their respective ids as keys.
     function assessTradeAssets(offer, players, draftPicks) {
-        var i,out, value, values;
+        var i, maxVal, out, isProtected, value, values;
         values = [];
+        isProtected = false;
         for (i = 0; i < offer.pids.length; i++) {
             value = getAssetValue(players[offer.pids[i]]);
             values.push(value);
+            if (offer.pidprotected.indexOf(offer.pids[i]) >= 0) {
+                isProtected = true;
+            }
         }
         for (i = 0; i < offer.dpids.length; i++) {
             value = getAssetValue(draftPicks[offer.dpids[i]]);
@@ -1006,6 +1030,13 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         for (i = 0; i < values.length; i++) {
             out += values[i] / (i + 1);
         }
+        offer.maxValue = (values.length > 0) ? values[0] : 0;
+        // if any of the asset is protected, increase trade value to make untradeable.
+        if (offer.tid === g.userTid && g.autoPlaySeasons === 0) {
+            isProtected = false;
+        }
+        offer.isProtected = isProtected;
+        out = (isProtected) ? out *= 1000 : out;
         return out;
     }
 
@@ -1014,7 +1045,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         values = {
             80: 100,
             70: 80,
-            60: 25,
+            60: 35,
             50: 10,
             40: 1,
         };
@@ -1060,6 +1091,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             pidsOrig = players.filter(function(p) {
                 return p.gamesUntilTradable === 0;
             }),
+            fnAdd,
             fnSort,
             fnTaxPaying,
             fnRebuilding,
@@ -1081,6 +1113,16 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             return (r === 0) ? b.born.year - a.born.year : r;
         };
 
+        fnAdd = function(p) {
+            offers.pids.push(p.pid);
+            offers.value = getAssetValue(p);
+            offers.contract += p.contract.amount;
+            if (offers.pidprotected.indexOf(p.pid) >= 0) {
+                // Remove added asset from protected list
+                offers.pidprotected.splice(offers.pidprotected.indexOf(p.pid), 1);
+            }
+        };
+
         fnTaxPaying = function() {
             pids = pidsOrig.filter(function(p) {
                 return p.contract.exp !== g.season &&
@@ -1096,10 +1138,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             });
 
             if (pids.length > 0) {
-                offers.pids.push(pids[0].pid);
-                offers.expiring += pids[0].contract.amount;
-                offers.value = getAssetValue(pids[0]);
-                offers.contract += pids[0].contract.amount;
+                fnAdd(pids[0]);
                 offers.priority = ["salarySpace", "expiring", "value"];
                 return;
             }
@@ -1114,9 +1153,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             pids.sort(fnSort);
 
             if (pids.length > 0) {
-                offers.pids.push(pids[0].pid);
-                offers.value = getAssetValue(pids[0]);
-                offers.contract += pids[0].contract.amount;
+                fnAdd(pids[0]);
                 offers.priority = ["salarySpace", "expiring", "value"];
                 return;
             }
@@ -1132,10 +1169,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             pids.sort(fnSort);
 
             if (pids.length > 0) {
-                offers.pids.push(pids[0].pid);
+                fnAdd(pids[0]);
                 offers.expiring += pids[0].contract.amount;
-                offers.value = getAssetValue(pids[0]);
-                offers.contract += pids[0].contract.amount;
                 return;
             }
         };
@@ -1150,9 +1185,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 random.shuffle(pids);
 
                 if (pids.length > 0) {
-                    offers.pids.push(pids[0].pid);
-                    offers.value = getAssetValue(pids[0]);
-                    offers.contract += pids[0].contract.amount;
+                    fnAdd(pids[0]);
                     return;
                 }
             }
@@ -1223,7 +1256,10 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 value: 0,                          // value of main trade asset
                 reqValue: random.uniform(0.9, 1.1),  // percentage of value that must be met before an offer is accepted.
                 contract: 0,
-                priority: ["value"]
+                priority: ["value"],
+                pidprotected: _.pluck(_.filter(players, function(p) {
+                    return p.rosterOrder <= 8;
+                }), 'pid')
             };
 
             if (t.tid === g.userTid && g.autoPlaySeasons === 0) {
