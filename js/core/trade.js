@@ -886,7 +886,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             result = (tradeNego[1].value / tradeNego[0].value) || 0;
             console.log(JSON.stringify(_.zip(_.pluck(tradeNego, 'tid'), _.pluck(tradeNego, 'pids'), _.pluck(tradeNego, 'dpids'))), result);
 
-            if (g.userTid === tradeNego[0].tid && tradeNego[0].value > 0) {
+            if (g.userTid === tradeNego[0].tid && tradeNego[0].value > 0 && tradeNego[1].value > 0) {
                 console.log(JSON.stringify(tradeNego), true);
                 return [true, tradeNego];
             }
@@ -1014,7 +1014,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             });
         }
         ts = ts.slice(0, 5);
-        random.shuffle(ts);
+        // random.shuffle(ts);
         if (ts[0].tid === finder.tid) {
             return ts[1];
         }
@@ -1071,9 +1071,9 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         if (asset.hasOwnProperty('round')) {
             if (asset.season === g.season) {
                 // TODO: set value of this years pick based on record.
-                return (asset.round === 1) ? 30 : 18;
+                return (asset.round === 1) ? 40 : 25;
             } else {
-                return (asset.round === 1) ? 25 : 15;
+                return (asset.round === 1) ? 36 : 22;
             }
 
             return value;

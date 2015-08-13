@@ -669,6 +669,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                 // Create new draft class for 3 years in the future
                 return draft.genPlayers(tx, g.PLAYER.UNDRAFTED_3);
             }).then(function () {
+                require('core/trade').updateTradingBlock(null, true, null, true);
+            }).then(function () {
                 return [helpers.leagueUrl(["free_agents"]), ["playerMovement"]];
             });
         });
