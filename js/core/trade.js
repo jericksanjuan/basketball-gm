@@ -363,125 +363,16 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         }
 
         return get().then(function (teams) {
-            var dpids, pids, tids;
-
-            tids = [teams[0].tid, teams[1].tid];
-            pids = [teams[0].pids, teams[1].pids];
-            dpids = [teams[0].dpids, teams[1].dpids];
-
             // The summary will return a warning if (there is a problem. In that case,
             // that warning will already be pushed to the user so there is no need to
             // return a redundant message here.
             return summary(teams).then(function (s) {
-                var outcome;
-
                 if (s.warning && !forceTrade) {
                     return [false, null];
                 }
 
-                outcome = "rejected"; // Default
-
-                // return team.valueChange(teams[1].tid, teams[0].pids, teams[1].pids, teams[0].dpids, teams[1].dpids, null).then(function (dv) {
-                return callEvaluateTrade(null, teams, true).then(function (dv) {
-                    var formatAssetsEventLog, tx;
-
-                    tx = dao.tx(["draftPicks", "players", "playerStats"], "readwrite");
-                    if (dv && dv || forceTrade) {
-                        // Trade players
-                        outcome = "accepted";
-                        [0, 1].forEach(function (j) {
-                            var k;
-
-                            if (j === 0) {
-                                k = 1;
-                            } else if (j === 1) {
-                                k = 0;
-                            }
-
-                            pids[j].forEach(function (pid) {
-                                dao.players.get({
-                                    ot: tx,
-                                    key: pid
-                                }).then(function (p) {
-                                    p.tid = tids[k];
-                                    // Don't make traded players untradable
-                                    //p.gamesUntilTradable = 15;
-                                    p.ptModifier = 1; // Reset
-                                    if (g.phase <= g.PHASE.PLAYOFFS) {
-                                        p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
-                                    }
-                                    dao.players.put({ot: tx, value: p});
-                                });
-                            });
-
-                            dpids[j].forEach(function (dpid) {
-                                dao.draftPicks.get({
-                                    ot: tx,
-                                    key: dpid
-                                }).then(function (dp) {
-                                    dp.tid = tids[k];
-                                    dp.abbrev = g.teamAbbrevsCache[tids[k]];
-                                    dao.draftPicks.put({ot: tx, value: dp});
-                                });
-                            });
-                        });
-
-                        // Log event
-                        formatAssetsEventLog = function (t) {
-                            var i, strings, text;
-
-                            strings = [];
-
-                            t.trade.forEach(function (p) {
-                                strings.push('<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a>');
-                            });
-                            t.picks.forEach(function (dp) {
-                                strings.push('a ' + dp.desc);
-                            });
-
-                            if (strings.length === 0) {
-                                text = "nothing";
-                            } else if (strings.length === 1) {
-                                text = strings[0];
-                            } else if (strings.length === 2) {
-                                text = strings[0] + " and " + strings[1];
-                            } else {
-                                text = strings[0];
-                                for (i = 1; i < strings.length; i++) {
-                                    if (i === strings.length - 1) {
-                                        text += ", and " + strings[i];
-                                    } else {
-                                        text += ", " + strings[i];
-                                    }
-                                }
-                            }
-
-                            return text;
-                        };
-
-                        eventLog.add(null, {
-                            type: "trade",
-                            text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[0]], g.season]) + '">' + g.teamNamesCache[tids[0]] + '</a> traded ' + formatAssetsEventLog(s.teams[0]) + ' to the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[1]], g.season]) + '">' + g.teamNamesCache[tids[1]] + '</a> for ' + formatAssetsEventLog(s.teams[1]) + '.',
-                            showNotification: false,
-                            pids: pids[0].concat(pids[1]),
-                            tids: tids
-                        });
-                    }
-
-                    return tx.complete().then(function () {
-                        if (outcome === "accepted") {
-                            return clear().then(function () { // This includes dbChange
-                                // Auto-sort CPU team roster
-                                if (g.userTids.indexOf(tids[1]) < 0) {
-                                    return team.rosterAutoSort(null, tids[1]);
-                                }
-                            }).then(function () {
-                                return [true, 'Trade accepted! "Nice doing business with you!"'];
-                            });
-                        }
-
-                        return [false, 'Trade rejected! "What, are you crazy?"'];
-                    });
+                return callEvaluateTrade(null, teams, true).then(function(dv) {
+                    return doTrade(dv, teams, s, forceTrade);
                 });
             });
         });
@@ -782,9 +673,117 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         });
     }
 
-    function doTrade(tx, tradeNego) {
-        tx = dao.tx(["teams", "players", "playerStats", "draftPicks", "releasedPlayers"],
-            "readwrite", tx);
+    function doTrade(dv, teams, s, forceTrade) {
+        var dpids, formatAssetsEventLog, outcome, pids, tids, tx;
+
+        forceTrade = forceTrade || false;
+
+        if (s.warning && !forceTrade) {
+            return [false, null];
+        }
+
+        tids = [teams[0].tid, teams[1].tid];
+        pids = [teams[0].pids, teams[1].pids];
+        dpids = [teams[0].dpids, teams[1].dpids];
+        outcome = "rejected";
+
+        tx = dao.tx(["draftPicks", "players", "playerStats"], "readwrite");
+        if (dv && dv || forceTrade) {
+            // Trade players
+            outcome = "accepted";
+            [0, 1].forEach(function (j) {
+                var k;
+
+                if (j === 0) {
+                    k = 1;
+                } else if (j === 1) {
+                    k = 0;
+                }
+
+                pids[j].forEach(function (pid) {
+                    dao.players.get({
+                        ot: tx,
+                        key: pid
+                    }).then(function (p) {
+                        p.tid = tids[k];
+                        // Don't make traded players untradable
+                        //p.gamesUntilTradable = 15;
+                        p.ptModifier = 1; // Reset
+                        if (g.phase <= g.PHASE.PLAYOFFS) {
+                            p = player.addStatsRow(tx, p, g.phase === g.PHASE.PLAYOFFS);
+                        }
+                        dao.players.put({ot: tx, value: p});
+                    });
+                });
+
+                dpids[j].forEach(function (dpid) {
+                    dao.draftPicks.get({
+                        ot: tx,
+                        key: dpid
+                    }).then(function (dp) {
+                        dp.tid = tids[k];
+                        dp.abbrev = g.teamAbbrevsCache[tids[k]];
+                        dao.draftPicks.put({ot: tx, value: dp});
+                    });
+                });
+            });
+
+            // Log event
+            formatAssetsEventLog = function (t) {
+                var i, strings, text;
+
+                strings = [];
+
+                t.trade.forEach(function (p) {
+                    strings.push('<a href="' + helpers.leagueUrl(["player", p.pid]) + '">' + p.name + '</a>');
+                });
+                t.picks.forEach(function (dp) {
+                    strings.push('a ' + dp.desc);
+                });
+
+                if (strings.length === 0) {
+                    text = "nothing";
+                } else if (strings.length === 1) {
+                    text = strings[0];
+                } else if (strings.length === 2) {
+                    text = strings[0] + " and " + strings[1];
+                } else {
+                    text = strings[0];
+                    for (i = 1; i < strings.length; i++) {
+                        if (i === strings.length - 1) {
+                            text += ", and " + strings[i];
+                        } else {
+                            text += ", " + strings[i];
+                        }
+                    }
+                }
+
+                return text;
+            };
+
+            eventLog.add(null, {
+                type: "trade",
+                text: 'The <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[0]], g.season]) + '">' + g.teamNamesCache[tids[0]] + '</a> traded ' + formatAssetsEventLog(s.teams[0]) + ' to the <a href="' + helpers.leagueUrl(["roster", g.teamAbbrevsCache[tids[1]], g.season]) + '">' + g.teamNamesCache[tids[1]] + '</a> for ' + formatAssetsEventLog(s.teams[1]) + '.',
+                showNotification: false,
+                pids: pids[0].concat(pids[1]),
+                tids: tids
+            });
+        }
+
+        return tx.complete().then(function () {
+            if (outcome === "accepted") {
+                return clear().then(function () { // This includes dbChange
+                    // Auto-sort CPU team roster
+                    if (g.userTids.indexOf(tids[1]) < 0) {
+                        return team.rosterAutoSort(null, tids[1]);
+                    }
+                }).then(function () {
+                    return [true, 'Trade accepted! "Nice doing business with you!"'];
+                });
+            }
+
+            return [false, 'Trade rejected! "What, are you crazy?"'];
+        });
 
         // After trade, remove pids and dpids in team.offers object.
         // do this by
@@ -809,6 +808,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             for (i = 0; i < 2; i++) {
                 tradeNego[i].pids = tradeTeams[i].pids;
                 tradeNego[i].dpids = tradeTeams[i].dpids;
+                tradeNego[i].value = 0;
             }
             order = _.pluck(tradeTeams, "tid");
             if (firstResult) {
@@ -832,7 +832,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
     /**
      * tradeNego: [offer1, offer2]
      */
-    function evaluateTrade(tx, tradeNego) {
+    function evaluateTrade(tx, tradeNego, firstResult) {
         var fnEvaluateTrade, fnGetPlayers, fnGetDraftPicks, fnUpdateTradeValue, tids;
         tx = dao.tx(["teams", "players", "playerStats", "draftPicks", "releasedPlayers"],
             "readwrite", tx);
@@ -868,7 +868,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 }
         };
 
-        fnEvaluateTrade = function(players, draftPicks, tradeNego, firstResult) {
+        fnEvaluateTrade = function(players, draftPicks, tradeNego) {
             var assets, i, result, tradeDpids, tradePids, v;
             firstResult = firstResult || false;
             tradePids = _.flatten(_.pluck(tradeNego, 'pids'));
@@ -883,9 +883,10 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             tradeNego = _.sortBy(tradeNego, 'value').reverse();
 
             result = (tradeNego[1].value / tradeNego[0].value) || 0;
-            console.log(tradeNego, result);
+            console.log(JSON.stringify(_.zip(_.pluck(tradeNego, 'tid'), _.pluck(tradeNego, 'pids'), _.pluck(tradeNego, 'dpids'))), result);
 
             if (g.userTid === tradeNego[0].tid && tradeNego[0].value > 0) {
+                console.log(JSON.stringify(tradeNego), true);
                 return [true, tradeNego];
             }
 
@@ -925,8 +926,12 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 fnUpdateTradeValue(tradeNego, players, draftPicks);
 
                 if (firstResult) {
+                    tradeNego = _.sortBy(tradeNego, 'value');
+                    if (g.userTid === tradeNego[0].tid) {
+                        tradeNego = tradeNego.reverse();
+                    }
                     result = (tradeNego[1].value / tradeNego[0].value) || 0;
-                    return [result < tradeNego[0].reqValue];
+                    return result >= tradeNego[0].reqValue;
                 }
 
                 assets = assets.filter(function(p) {
@@ -1040,6 +1045,9 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         }
         for (i = 0; i < offer.dpids.length; i++) {
             value = getAssetValue(draftPicks[offer.dpids[i]]);
+            if (offer.dpidprotected.indexOf(offer.dpids[i]) >= 0) {
+                isProtected = true;
+            }
             values.push(value);
         }
 
@@ -1070,9 +1078,9 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         if (asset.hasOwnProperty('round')) {
             if (asset.season === g.season) {
                 // TODO: set value of this years pick based on record.
-                return (asset.round === 1) ? 30 : 15;
+                return (asset.round === 1) ? 30 : 18;
             } else {
-                return (asset.round === 1) ? 26 : 11;
+                return (asset.round === 1) ? 25 : 15;
             }
 
             return value;
@@ -1174,7 +1182,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             if (pids.length > 0) {
                 fnAdd(pids[0]);
                 offers.priority = ["salarySpace", "expiring", "value"];
-                offers.reqValue = 0.5;
+                offers.reqValue = random.uniform(0.5, 0.7);
                 return;
             }
         };
@@ -1249,6 +1257,10 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             if (dpids.length > 0) {
                 offers.dpids.push(dpids[0].dpid);
                 offers.value = getAssetValue(dpids[0]);
+                if (offers.dpidprotected.indexOf(dpids[0].dpid) >= 0) {
+                    // Remove added asset from protected list
+                    offers.dpidprotected.splice(offers.dpidprotected.indexOf(dpids[0].dpid), 1);
+                }
             }
         }
     }
@@ -1279,7 +1291,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 priority: ["value"],
                 pidprotected: _.pluck(_.filter(players, function(p) {
                     return p.rosterOrder <= 8;
-                }), 'pid')
+                }), 'pid'),
+                dpidprotected: _.pluck(draftPicks, 'dpid')
             };
 
             if (t.tid === g.userTid && g.autoPlaySeasons === 0) {
