@@ -1383,7 +1383,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
 
         return dao.teams.getAll()
         .then(function(teams) {
-            var i, result, tids, tmp, tradeNego;
+            var i, order, result, tids, tmp, tradeNego;
             if (g.autoPlaySeasons === 0) {
                 teams = teams.filter(function(t) {
                     return t.tid !== g.userTid;
@@ -1391,13 +1391,16 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             }
             random.shuffle(teams);
             tradeNego = [teams[0].offers, matchTradeTeams(teams[0], teams).offers];
+            order = _.pluck(tradeNego, "tid");
             return evaluateTrade(null, tradeNego)
                 .then(function(result) {
                     if (result[0]) {
                         // switch up order
-                        tmp = result[1][0];
-                        result[1][0] = result[1][1];
-                        result[1][1] = tmp;
+                        if (order[0] !== result[1][0].tid) {
+                            tmp = result[1][0];
+                            result[1][0] = result[1][1];
+                            result[1][1] = tmp;
+                        }
 
                         return Promise.join(
                             result[0],
@@ -1508,5 +1511,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         updateTradingBlock: updateTradingBlock,
         evaluateTrade: evaluateTrade,
         tickCpuTradingDay: tickCpuTradingDay,
+        doCPUTrade: doCPUTrade
     };
 });
