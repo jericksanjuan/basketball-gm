@@ -656,35 +656,30 @@ define(["dao", "globals", "ui", "core/finances", "core/player", "core/team", "li
     }
 
     function tickDraftClasses(tx) {
-        // Bump up future draft classes (nested so tid updates don't cause race conditions)
-        return function() {
-            return dao.players.iterate({
+        var tickDraftClass, updatePlayer;
+
+        tickDraftClass = function(dtid, ftid) {
+            return dao.players.getAll({
                 ot: tx,
                 index: "tid",
-                key: g.PLAYER.UNDRAFTED_2,
-                callback: function (p) {
-                    p.tid = g.PLAYER.UNDRAFTED;
-                    p.ratings[0].fuzz /= 2;
-                    return p;
-                }
-            })
-            .then(function () {
-                return dao.players.iterate({
+                key: dtid
+            }).map(function(p) {
+                p.tid = ftid;
+                p.ratings[0].fuzz /= 2;
+                return dao.players.put({
                     ot: tx,
-                    index: "tid",
-                    key: g.PLAYER.UNDRAFTED_3,
-                    callback: function (p) {
-                        p.tid = g.PLAYER.UNDRAFTED_2;
-                        p.ratings[0].fuzz /= 2;
-                        return p;
-                    }
-                });
-            })
-            .then(function () {
-                // Create new draft class for 3 years in the future
-                return genPlayers(tx, g.PLAYER.UNDRAFTED_3);
-            });
+                    value: p
+                })
+            }, {concurrency: Infinity})
         };
+
+        return Promise.join(
+                tickDraftClass(g.PLAYER.UNDRAFTED_2, g.PLAYER.UNDRAFTED),
+                tickDraftClass(g.PLAYER.UNDRAFTED_3, g.PLAYER.UNDRAFTED_2),
+                function() {
+                    genPlayers(tx, g.PLAYER.UNDRAFTED_3);
+                }
+            );
     }
 
     return {
