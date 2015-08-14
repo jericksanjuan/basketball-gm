@@ -482,7 +482,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             }).then(function() {
                 return draft.tickDraftClasses(tx);
             }).then(function() {
-                return require('core/trade').updateTradingBlock(tx, true, null, true);
+                return require('core/trade').updateTradingBlock(tx, true, null, false);
             }).then(function () {
                 return [helpers.leagueUrl(["free_agents"]), ["playerMovement"]];
             });
