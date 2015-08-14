@@ -834,7 +834,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
      * tradeNego: [offer1, offer2]
      */
     function evaluateTrade(tx, tradeNego, firstResult) {
-        var fnEvaluateTrade, fnGetPlayers, fnGetDraftPicks, fnUpdateTradeValue, tids;
+        var fnChangeAsset, fnEvaluateTrade, fnEvaluateStep, fnGetPlayers, fnGetDraftPicks, fnUpdateTradeValue, tids;
         tx = dao.tx(["teams", "players", "playerStats", "draftPicks", "releasedPlayers"],
             "readwrite", tx);
 
@@ -869,6 +869,95 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 }
         };
 
+        fnChangeAsset = function(offer, assets, assetCount, players, draftPicks, cond) {
+            var toRemove;
+            if(assets[0].hasOwnProperty('round') && cond) {
+                offer.dpids = offer.dpids || [];
+                offer.dpids.push(assets[0].dpid);
+                assetCount ++;
+                if (assetCount > 4) {
+                    offer.dpids.splice(0, 1);
+                }
+            } else if (assets[0].hasOwnProperty('pid')) {
+                offer.pids = offer.pids || [];
+                offer.pids.push(assets[0].pid);
+                offer.contract += assets[0].contract.amount;
+                assetCount ++;
+                if (assetCount > 4) {
+                    toRemove = offer.pids.splice(0, 1);
+                    console.log("to remove", toRemove);
+                    offer.contract -= players[toRemove[0]].contract.amount;
+                }
+            }
+            return [assets.splice(0, 1), assetCount];
+        };
+
+        fnEvaluateStep = function(tradeNego, assets, players, draftPicks, noAddUser) {
+            var assetCount = [
+                    tradeNego[0].pids.length + tradeNego[0].dpids.length,
+                    tradeNego[1].pids.length + tradeNego[1].dpids.length
+                ],
+                cond = {value: false, salary: false, salaryOther: false},
+                localAssets = assets.slice(0).filter(function(p) {return p.tid === tradeNego[1].tid;}),
+                otherAssets = assets.slice(0).filter(function(p) {return p.tid === tradeNego[0].tid;}),
+                removed = [],
+                removedOther = [],
+                sort,
+                tmp;
+
+            noAddUser = noAddUser || false;
+
+            sort = (tradeNego[0].priority[0] === "salarySpace") ? "contract_amount" : "tradeValue";
+            localAssets = _.sortBy(localAssets, sort);
+            otherAssets = _.sortBy(localAssets, sort);
+            console.log('sort', sort);
+            if (sort === "tradeValue") {
+                localAssets = localAssets.reverse();
+            } else {
+                localAssets = localAssets.filter(function(p) {
+                    if (p.hasOwnProperty("pid")) {
+                        return p.contract.exp === g.season;
+                    } else {
+                        return true;
+                    }
+                });
+                otherAssets = otherAssets.filter(function(p) {
+                    if (p.hasOwnProperty("pid")) {
+                        // return non-expiring;
+                        return p.contract.exp !== g.season;
+                    } else {
+                        return true;
+                    }
+                });
+            }
+
+            while(localAssets.length > 0 && otherAssets.length > 0) {
+                cond.value = tradeNego[1].value / tradeNego[0].value >= tradeNego[0].reqValue;
+                cond.salary = (tradeNego[1].contract - tradeNego[1].salarySpace) / (tradeNego[0].contract) < 1.25;
+                cond.salaryOther = (tradeNego[0].contract - tradeNego[0].salarySpace) / (tradeNego[1].contract) < 1.25;
+
+                console.log(JSON.stringify(cond));
+                if (cond.value && cond.salary && (cond.salaryOther || noAddUser)) {
+                    localAssets = [];
+                }
+
+                if (!cond.value || !cond.salary) {
+                    console.log('adjusting');
+                    tmp = fnChangeAsset(tradeNego[1], localAssets, assetCount[1], players, draftPicks, cond.salaryOther);
+                    removed = removed.concat(tmp[0]);
+                    assetCount[1] = tmp[1];
+                } else if (!cond.salaryOther && !noAddUser) {
+                    console.log('adjusting other');
+                    tmp = fnChangeAsset(tradeNego[0], otherAssets, assetCount[0], players, draftPicks, cond.salary);
+                    removedOther = removedOther.concat(tmp[0]);
+                    assetCount[0] = tmp[1];
+                }
+
+                fnUpdateTradeValue(tradeNego, players, draftPicks);
+
+            }
+        };
+
         fnEvaluateTrade = function(players, draftPicks, tradeNego) {
             var assets, i, result, tradeDpids, tradePids, v;
             firstResult = firstResult || false;
@@ -901,25 +990,18 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                     _.union(players, draftPicks)
                 )
                 .filter(function(p) {
-                    var cond = (p.hasOwnProperty('round')) ? tradeDpids.indexOf(p.dpid) === -1 : tradePids.indexOf(p.pid) === -1;
-                    return cond && p.tid === tradeNego[1].tid;
+                    return (p.hasOwnProperty('round')) ? tradeDpids.indexOf(p.dpid) === -1 : tradePids.indexOf(p.pid) === -1;
                 }).map(function(p) {
                     p.tradeValue = getAssetValue(p);
+                    if (p.hasOwnProperty('pid')) {
+                        p.contract_amount = p.contract.amount + p.tradeValue;
+                    } else {
+                        p.contract_amount = (p.round === 1) ? 5000 : 500;
+                        p.contract_amount += p.tradeValue;
+                    }
                     return p;
                 });
 
-                if (tradeNego[0].priority[0] === "salarySpace") {
-                    assets = assets.filter(function(p) {
-                        if (p.hasOwnProperty('pid')) {
-                            p.contract_amount = p.contract.amount + p.tradeValue;
-                            return p.contract.exp === g.season;
-                        } else {
-                            p.contract_amount = (p.round === 1) ? 5000 : 500;
-                            p.contract_amount += p.tradeValue;
-                            return p;
-                        }
-                    });
-                }
 
                 players = _.object(_.pluck(players, "pid"), players);
                 draftPicks = _.object(_.pluck(draftPicks, "dpid"), draftPicks);
@@ -937,45 +1019,21 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
 
                 assets = assets.filter(function(p) {
                     // Only add player of lesser trade value.
-                    return p.tradeValue < tradeNego[0].value;
-                }).filter(function(p) {
-                    if (p.hasOwnProperty('round')) {
-                        return true;
-                    } else {
-                        // Don't add more players if other team has no roster space.
-                        if (tradeNego[0].rosterSpace + tradeNego[0].pids.length <= tradeNego[1].pids.length) {
-                            return;
-                        }
-                        return p.contract.amount < tradeNego[0].contract + tradeNego[0].salarySpace;
-                    }
+                    return p.tradeValue < tradeNego[0].maxValue;
                 });
+                // .filter(function(p) {
+                //     if (p.hasOwnProperty('round')) {
+                //         return true;
+                //     } else {
+                //         // Don't add more players if other team has no roster space.
+                //         if (tradeNego[0].rosterSpace + tradeNego[0].pids.length <= tradeNego[1].pids.length) {
+                //             return;
+                //         }
+                //         return p.contract.amount < tradeNego[0].contract + tradeNego[0].salarySpace;
+                //     }
+                // });
+                fnEvaluateStep(tradeNego, assets, players, draftPicks, tradeNego[1].tid === g.userTid);
 
-                // If difference in value is small, add smaller value asset.
-                if (tradeNego[0].value - tradeNego[1].value <= 0) {
-                    assets = [];
-                } else if (tradeNego[0].value - tradeNego[1].value <= 5) {
-                    assets = _.sortBy(assets, 'tradeValue');
-                } else {
-                    assets = _.sortBy(assets, 'tradeValue').reverse();
-                }
-
-                if (tradeNego[0].priority[0] === "salarySpace") {
-                    assets = _.sortBy(assets, 'contract_amount');
-                }
-
-                if (assets.length > 0) {
-                    if(assets[0].hasOwnProperty('round')) {
-                        tradeNego[1].dpids = tradeNego[1].dpids || [];
-                        tradeNego[1].dpids.push(assets[0].dpid);
-                    } else {
-                        tradeNego[1].pids = tradeNego[1].pids || [];
-                        tradeNego[1].pids.push(assets[0].pid);
-                        tradeNego[1].contract += assets[0].contract.amount;
-                    }
-
-                    fnUpdateTradeValue(tradeNego, players, draftPicks);
-                    return fnEvaluateTrade(players, draftPicks, tradeNego);
-                }
             }
 
             // fail if either does not have asset to trade.
@@ -987,6 +1045,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             result = (tradeNego[1].value / tradeNego[0].value) || 0;
 
             console.log(JSON.stringify(tradeNego), result >= tradeNego[0].reqValue);
+            console.log(tradeNego[1].priority[0], JSON.stringify(_.zip(_.pluck(tradeNego, 'tid'), _.pluck(tradeNego, 'pids'), _.pluck(tradeNego, 'dpids'))), result);
             return [result >= tradeNego[0].reqValue, tradeNego];
         };
 
@@ -1071,9 +1130,9 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         if (asset.hasOwnProperty('round')) {
             if (asset.season === g.season) {
                 // TODO: set value of this years pick based on record.
-                return (asset.round === 1) ? 40 : 25;
+                return (asset.round === 1) ? 43 : 18;
             } else {
-                return (asset.round === 1) ? 36 : 22;
+                return (asset.round === 1) ? 40 : 15;
             }
 
             return value;
@@ -1147,7 +1206,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 return p.contract.exp !== g.season &&
                     p.contract.amount + tmInfo.luxuryTax > 0 &&
                     p.contract.amount > g.maxContract * 0.2 &&
-                    p.playerGrade < 0.8;
+                    p.playerGrade < 0.6;
             });
             pids.sort(function(a, b) {
                 var r;
@@ -1175,7 +1234,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             if (pids.length > 0) {
                 fnAdd(pids[0]);
                 offers.priority = ["salarySpace", "expiring", "value"];
-                offers.reqValue = random.uniform(0.5, 0.7);
+                // offers.reqValue = random.uniform(0.5, 0.7);
                 return;
             }
         };
@@ -1201,7 +1260,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 console.log('shake things up');
                 pids = pidsOrig.filter(function(p) {
                     return p.contract.amount > g.maxContract * 0.25 &&
-                        p.playerGrade > 0.7;
+                        p.playerGrade > 0.8;
                 });
                 random.shuffle(pids);
 
@@ -1213,12 +1272,12 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         };
 
         // taxpaying team reduce salary.
-        if (tmInfo.isTaxPaying && tmInfo.games.gp > 20 && tmInfo.games.winp < 0.25 ) {
+        if (tmInfo.isTaxPaying && (tmInfo.games.gp > 41 && tmInfo.games.winp < 0.67 || tmInfo.cash < 0)) {
             return fnTaxPaying();
         }
 
         // rebuilding team trade non-expiring for expiring
-        if (tmInfo.isRebuilding && tmInfo.salarySpace < g.salaryCap - g.minPayroll && tmInfo.games.gp > 20) {
+        if (tmInfo.isRebuilding && tmInfo.salarySpace < g.salaryCap - g.minPayroll && tmInfo.games.gp > 20 && tmInfo.games.winp < 0.55) {
             return fnRebuilding();
         }
 
@@ -1329,13 +1388,13 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 getTeamOffers
             )
             .then(function() {
-                teamTradingSkip[tid] = random.randInt(0, 45);
+                teamTradingSkip[tid] = random.randInt(0, 20);
             });
         };
 
         if (!localStorage.teamTradingSkip) {
             teamTradingSkip = _.range(30).map(function() {
-                return random.randInt(0, 45);
+                return random.randInt(0, 20);
             });
             localStorage.teamTradingSkip = JSON.stringify(teamTradingSkip);
         } else {
@@ -1359,6 +1418,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         info = {
             isRebuilding: t.strategy === "rebuilding",
             salarySpace: Math.max(g.salaryCap - payroll[0], 0),
+            cash: s.cash,
             luxuryTax: (payroll[0] > g.luxuryPayroll) ? payroll[0] - g.luxuryPayroll : 0,
             isTaxPaying: payroll[0] > g.luxuryPayroll,
             madePlayoffs: s.playoffRoundsWon >= 0,
@@ -1387,7 +1447,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             if (g.autoPlaySeasons === 0) {
                 teams = teams.filter(function(t) {
                     return t.tid !== g.userTid;
-                })
+                });
             }
             random.shuffle(teams);
             tradeNego = [teams[0].offers, matchTradeTeams(teams[0], teams).offers];
@@ -1426,7 +1486,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         tx = dao.tx(["teams", "players", "releasedPlayers", "draftPicks"], "readwrite", tx);
 
         doCPUTrade(tx);
-        localStorage.skipTrading = 0 //random.randInt(0, 5);
+        // localStorage.skipTrading = 0; //random.randInt(0, 5);
+        localStorage.skipTrading = random.randInt(0, 5);
     }
 
     function tickCpuTradingDay(tx) {
