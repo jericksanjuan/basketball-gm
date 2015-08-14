@@ -869,13 +869,13 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 }
         };
 
-        fnChangeAsset = function(offer, assets, assetCount, players, draftPicks, cond) {
+        fnChangeAsset = function(offer, assets, assetCount, maxAssetCount, players, draftPicks, cond) {
             var toRemove;
             if(assets[0].hasOwnProperty('round') && cond) {
                 offer.dpids = offer.dpids || [];
                 offer.dpids.push(assets[0].dpid);
                 assetCount ++;
-                if (assetCount > 4) {
+                if (assetCount > maxAssetCount) {
                     offer.dpids.splice(0, 1);
                 }
             } else if (assets[0].hasOwnProperty('pid')) {
@@ -883,7 +883,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 offer.pids.push(assets[0].pid);
                 offer.contract += assets[0].contract.amount;
                 assetCount ++;
-                if (assetCount > 4) {
+                if (assetCount > maxAssetCount) {
                     toRemove = offer.pids.splice(0, 1);
                     console.log("to remove", toRemove);
                     offer.contract -= players[toRemove[0]].contract.amount;
@@ -897,6 +897,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                     tradeNego[0].pids.length + tradeNego[0].dpids.length,
                     tradeNego[1].pids.length + tradeNego[1].dpids.length
                 ],
+                assetMax,
+                assetMaxValues,
                 cond = {value: false, salary: false, salaryOther: false},
                 localAssets = assets.slice(0).filter(function(p) {return p.tid === tradeNego[1].tid;}),
                 otherAssets = assets.slice(0).filter(function(p) {return p.tid === tradeNego[0].tid;}),
@@ -907,9 +909,14 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
 
             noAddUser = noAddUser || false;
 
+            assetMax = [
+                (tradeNego[1].maxValue > 80) ? 4 : (tradeNego[1].maxValue > 60) ? 3 : (tradeNego[1].maxValue > 50) ? 2 : 1,
+                (tradeNego[0].maxValue > 80) ? 4 : (tradeNego[0].maxValue > 60) ? 3 : (tradeNego[0].maxValue > 50) ? 2 : 1,
+            ];
+
             sort = (tradeNego[0].priority[0] === "salarySpace") ? "contract_amount" : "tradeValue";
             localAssets = _.sortBy(localAssets, sort);
-            otherAssets = _.sortBy(localAssets, sort);
+            otherAssets = _.sortBy(otherAssets, sort);
             console.log('sort', sort);
             if (sort === "tradeValue") {
                 localAssets = localAssets.reverse();
@@ -939,16 +946,17 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                 console.log(JSON.stringify(cond));
                 if (cond.value && cond.salary && (cond.salaryOther || noAddUser)) {
                     localAssets = [];
+                    otherAssets = [];
                 }
 
                 if (!cond.value || !cond.salary) {
                     console.log('adjusting');
-                    tmp = fnChangeAsset(tradeNego[1], localAssets, assetCount[1], players, draftPicks, cond.salaryOther);
+                    tmp = fnChangeAsset(tradeNego[1], localAssets, assetCount[1], assetMax[1], players, draftPicks, cond.salaryOther);
                     removed = removed.concat(tmp[0]);
                     assetCount[1] = tmp[1];
                 } else if (!cond.salaryOther && !noAddUser) {
                     console.log('adjusting other');
-                    tmp = fnChangeAsset(tradeNego[0], otherAssets, assetCount[0], players, draftPicks, cond.salary);
+                    tmp = fnChangeAsset(tradeNego[0], otherAssets, assetCount[0], assetMax[1], players, draftPicks, cond.salary);
                     removedOther = removedOther.concat(tmp[0]);
                     assetCount[0] = tmp[1];
                 }
@@ -1536,9 +1544,12 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
     function initiateTrades(tx) {
         tx = dao.tx(["teams", "players", "releasedPlayers", "draftPicks"], "readwrite", tx);
 
-        doCPUTrade(tx);
-        // localStorage.skipTrading = 0; //random.randInt(0, 5);
-        localStorage.skipTrading = random.randInt(0, 5);
+        return Promise.each(_.range(3), function() {
+            // do at most 3 trades per day.
+            return doCPUTrade(tx);
+        }).then(function() {
+            localStorage.skipTrading = random.randInt(0, 7);
+        });
     }
 
     function tickCpuTradingDay(tx) {
