@@ -1600,11 +1600,11 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
     function initiateTrades(tx) {
         tx = dao.tx(["teams", "players", "releasedPlayers", "draftPicks"], "readwrite", tx);
 
-        return Promise.each(_.range(3), function() {
+        return Promise.each(_.range(random.randInt(1, 3)), function() {
             // do at most 3 trades per day.
             return doCPUTrade(tx);
         }).then(function() {
-            localStorage.skipTrading = random.randInt(0, 7);
+            localStorage.skipTrading = random.randInt(0, 21);
         });
     }
 

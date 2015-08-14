@@ -580,7 +580,6 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
     }
 
     function newPhaseFreeAgency(tx) {
-<<<<<<< Updated upstream
         var strategies;
 
         return team.filter({
@@ -670,7 +669,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                 // Create new draft class for 3 years in the future
                 return draft.genPlayers(tx, g.PLAYER.UNDRAFTED_3);
             }).then(function () {
-                return require('core/trade').updateTradingBlock(tx, true, null, true);
+                return require('core/trade').updateTradingBlock(tx, true, null, false);
             }).then(function () {
                 return [helpers.leagueUrl(["free_agents"]), ["playerMovement"]];
             });
