@@ -452,7 +452,7 @@ define(["dao", "globals", "core/team", "lib/bluebird", "lib/jquery", "lib/unders
         }
 
         return dao.awards.get({key: g.season}).then(function (awards) {
-            if (awards.roy.tid === g.userTid) {
+            if (awards.hasOwnProperty('roy') && awards.roy.tid === g.userTid) {
                 return dao.players.get({key: awards.roy.pid}).then(function (p) {
                     if (p.tid === g.userTid && p.draft.tid === g.userTid && p.draft.year === g.season - 1 && (p.draft.round > 1 || p.draft.pick >= 15)) {
                         if (saveAchievement) {

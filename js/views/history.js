@@ -62,6 +62,16 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                     awards.allRookie = [];
                 }
 
+                if (!awards.hasOwnProperty("roy")) {
+                    awards.roy = {
+                        pid: 0,
+                        name: "N/A",
+                        pts: 0,
+                        trb: 0,
+                        ast: 0
+                    };
+                }
+
                 // Get list of retired players
                 retiredPlayers = player.filter(retiredPlayers, {
                     attrs: ["pid", "name", "age", "hof"],
