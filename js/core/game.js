@@ -876,6 +876,8 @@ define(["dao", "globals", "ui", "core/freeAgents", "core/finances", "core/gameSi
                                     // Do regular season cpu free agent signing.
                                     return freeAgents.tickRegSeasonFreeAgency();
                                 }
+                            }).then(function () {
+                                return require('core/trade').tickCpuTradingDay();
                             }).then(cbPlayGames);
                         });
                     }

@@ -552,6 +552,8 @@ define(["dao", "db", "globals", "ui", "core/draft", "core/finances", "core/phase
                         return Promise.map(teams, function (t) {
                             return team.rosterAutoSort(tx, t.tid);
                         }, {concurrency: Infinity}).then(function () {
+                            return require('core/trade').updateTradingBlock(null, true, null, true);
+                        }).then(function () {
                             return lid;
                         });
                     });

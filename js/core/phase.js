@@ -112,6 +112,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
         return dao.teams.getAll({ot: tx}).then(function (teams) {
             return season.setSchedule(tx, season.newSchedule(teams));
         }).then(function () {
+            require('core/trade').updateTradingBlock(null, true, null, true);
+        }).then(function () {
             // First message from owner
             if (g.showFirstOwnerMessage) {
                 return message.generate(tx, {wins: 0, playoffs: 0, money: 0});
@@ -478,7 +480,9 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             }). then(function() {
                 return freeAgents.readyPlayersFA(tx, oBaseMoods);
             }).then(draft.tickDraftClasses(tx)
-            ).then(function () {
+            ).then(function() {
+                return require('core/trade').updateTradingBlock(null, true, null, true);
+            }).then(function () {
                 return [helpers.leagueUrl(["free_agents"]), ["playerMovement"]];
             });
     }
