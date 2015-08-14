@@ -2,7 +2,7 @@
  * @name core.trade
  * @namespace Trades between the user's team and other teams.
  */
-define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/random"], function (dao, g, league, player, team, Promise, _, eventLog, helpers, random) {
+define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeAgents", "lib/bluebird", "lib/underscore", "util/eventLog", "util/helpers", "util/random"], function (dao, g, league, player, team, freeAgents, Promise, _, eventLog, helpers, random) {
     "use strict";
 
     /**
@@ -1458,7 +1458,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             teamTradingSkip = JSON.parse(localStorage.teamTradingSkip);
         }
 
-        return Promise.map(tids, updateTeamOffers)
+        return Promise.map(tids, updateTeamOffers, {concurrency: tids.length})
             .then(function() {
                 localStorage.teamTradingSkip = JSON.stringify(teamTradingSkip);
             });
@@ -1531,6 +1531,12 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
                                 tids = _.pluck(result[1], 'tid');
                                 console.log("cpu trade success", g.teamAbbrevsCache[tids[0]], g.teamAbbrevsCache[tids[1]]);
 
+                                if (freeAgents.hasOwnProperty("readyTeamsFA")) {
+                                    return freeAgents.readyTeamsFA(null, tids)
+                                    .then(function() {
+                                        updateTradingBlock(null, true, tids, true);
+                                    });
+                                }
                                 updateTradingBlock(null, true, tids, true);
                             } else {
                                 console.log('trade failed');
