@@ -526,11 +526,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
     /**
      * Ready all teams for free agency.
      */
-    function readyTeamsFA(tx) {
+    function readyTeamsFA(tx, tids) {
         var game, i, promises, readyTeam, teamComposite, teamMinSigningScore;
         game = require('core/game');
         tx = dao.tx(["players", "releasedPlayers", "teams"], "readwrite", tx);
         promises = [];
+        tids = tids || _.range(30);
 
         teamComposite = function (players, numOfPlayers) {
             var i, k, tc;
@@ -589,8 +590,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             return team;
         };
 
-        for (i = 0; i < g.numTeams; i++) {
-            promises.push(game.loadTeam(i, tx, true));
+        for (i = 0; i < tids.length; i++) {
+            promises.push(game.loadTeam(tids[i], tx, true));
         }
 
         return Promise.join(
@@ -606,7 +607,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                             return;
                         });
                     }
-                    return Promise.map(teams, readySave);
+                    return Promise.map(teams, readySave, {concurrency: tids.length});
                 }
             );
     }
@@ -646,7 +647,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
             }).map(function(p) {
                 p.compositeRating = playerComposite(p.ratings);
                 return player.addToFreeAgents(tx, p, g.PHASE.FREE_AGENCY, baseMoods);
-            });
+            }, {concurrency: Infinity});
         };
 
         return Promise.join(
@@ -802,7 +803,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "lib/bluebird", "lib
                 toUpdate = toUpdate.concat(tp);
             }
             helpers.muteConsole(false);
-            return Promise.map(toUpdate, updatePlayer);
+            return Promise.map(toUpdate, updatePlayer, {concurrency: Infinity});
         };
 
         return Promise.join(
