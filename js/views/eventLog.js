@@ -43,8 +43,6 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/knockout", "util/bbgmView",
                         }
                     });
 
-                    events.map(helpers.correctLinkLid);
-
                     return {
                         abbrev: inputs.abbrev,
                         events: events,
