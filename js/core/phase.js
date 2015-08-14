@@ -98,6 +98,8 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         freeAgents.readyPlayersFA(tx)
                     )
             }).then(function () {
+                return require('core/trade').updateTradingBlock(tx, true, null, true);
+            }).then(function () {
                 if (g.enableLogging && !window.inCordova) {
                     ads.show();
                 }
@@ -111,8 +113,6 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
     function newPhaseRegularSeason(tx) {
         return dao.teams.getAll({ot: tx}).then(function (teams) {
             return season.setSchedule(tx, season.newSchedule(teams));
-        }).then(function () {
-            require('core/trade').updateTradingBlock(null, true, null, true);
         }).then(function () {
             // First message from owner
             if (g.showFirstOwnerMessage) {
@@ -482,7 +482,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             }).then(function() {
                 return draft.tickDraftClasses(tx);
             }).then(function() {
-                require('core/trade').updateTradingBlock(null, true, null, true);
+                return require('core/trade').updateTradingBlock(tx, true, null, true);
             }).then(function () {
                 return [helpers.leagueUrl(["free_agents"]), ["playerMovement"]];
             });
@@ -549,7 +549,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                     require("core/league").updateLastDbChange();
 
                     if (phase === g.PHASE.PRESEASON) {
-                        phaseChangeTx = dao.tx(["gameAttributes", "players", "playerStats", "releasedPlayers", "teams", "negotiations", "messages"], "readwrite");
+                        phaseChangeTx = dao.tx(["gameAttributes", "players", "playerStats", "releasedPlayers", "teams", "negotiations", "messages", "draftPicks"], "readwrite");
                         return newPhasePreseason(phaseChangeTx);
                     }
                     if (phase === g.PHASE.REGULAR_SEASON) {
@@ -580,7 +580,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                         return newPhaseResignPlayers(phaseChangeTx);
                     }
                     if (phase === g.PHASE.FREE_AGENCY) {
-                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "teams", "releasedPlayers"], "readwrite");
+                        phaseChangeTx = dao.tx(["gameAttributes", "messages", "negotiations", "players", "teams", "releasedPlayers", "draftPicks", "playerStats"], "readwrite");
                         return newPhaseFreeAgency(phaseChangeTx);
                     }
                     if (phase === g.PHASE.FANTASY_DRAFT) {

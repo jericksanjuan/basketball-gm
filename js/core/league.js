@@ -548,11 +548,11 @@ define(["dao", "db", "globals", "ui", "core/draft", "core/finances", "core/phase
                         helpers.bbgmPing("league");
 
                         // Auto sort rosters
-                        tx = dao.tx("players", "readwrite");
+                        tx = dao.tx(["players", "playerStats", "teams", "draftPicks", "releasedPlayers"], "readwrite");
                         return Promise.map(teams, function (t) {
                             return team.rosterAutoSort(tx, t.tid);
                         }, {concurrency: Infinity}).then(function () {
-                            return require('core/trade').updateTradingBlock(null, true, null, true);
+                            return require('core/trade').updateTradingBlock(tx, true, null, true);
                         }).then(function () {
                             return lid;
                         });
