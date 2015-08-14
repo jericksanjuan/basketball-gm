@@ -1340,7 +1340,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
     }
 
     function setTradeableDpids(draftPicks, offers, tmInfo) {
-        var cond1, cond2, dpids, year;
+        var cond1, cond2, dpids, round, year;
         if (g.phase >= g.PHASE.AFTER_TRADE_DEADLINE && g.phase <= g.PHASE.PLAYOFFS ||
                 offers.pids.length > 0 ||
                 tmInfo.games.gp < 41 ) {
@@ -1350,10 +1350,12 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         cond2 = tmInfo.salarySpace > g.salaryCap - g.minPayroll && offers.rosterSpace > 0;
         if (cond1 || cond2) {
             year = (tmInfo.games.winp < 0.55) ? g.season + random.randInt(1, 3): g.season;
+            round = (Math.random > 0.9) ? 1 : 2;
             dpids = draftPicks.filter(function(dp) {
-                return dp.season === year && dp.round === 2;
+                return dp.season === year && dp.round === round;
             });
             if (dpids.length > 0) {
+                console.log('draft pick on trading block');
                 offers.dpids.push(dpids[0].dpid);
                 offers.value = getAssetValue(dpids[0]);
                 if (offers.dpidprotected.indexOf(dpids[0].dpid) >= 0) {
