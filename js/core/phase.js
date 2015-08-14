@@ -479,9 +479,10 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
                 return freeAgents.readyTeamsFA(tx);
             }). then(function() {
                 return freeAgents.readyPlayersFA(tx, oBaseMoods);
-            }).then(draft.tickDraftClasses(tx)
-            ).then(function() {
-                return require('core/trade').updateTradingBlock(null, true, null, true);
+            }).then(function() {
+                return draft.tickDraftClasses(tx);
+            }).then(function() {
+                require('core/trade').updateTradingBlock(null, true, null, true);
             }).then(function () {
                 return [helpers.leagueUrl(["free_agents"]), ["playerMovement"]];
             });
