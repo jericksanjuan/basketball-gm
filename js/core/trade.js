@@ -1089,7 +1089,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         for (i = 0; i < offer.pids.length; i++) {
             p = players[offer.pids[i]];
             value = getAssetValue(p);
-            value = (expOnly && p.contract.exp !== g.season) ? value/2 : value;
+            value = (expOnly && p.contract.exp !== g.season) ? value / 2 : value;
             values.push(value);
             if (offer.pidprotected.indexOf(offer.pids[i]) >= 0) {
                 isProtected = true;
@@ -1119,7 +1119,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
     }
 
     function getAssetValue(asset) {
-        var age, v, values;
+        var age, potVal, r, v, values;
         values = {
             80: 100,
             70: 80,
@@ -1128,40 +1128,87 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
             40: 1,
         };
         if (asset.hasOwnProperty('round')) {
-            if (asset.season === g.season) {
-                // TODO: set value of this years pick based on record.
-                return (asset.round === 1) ? 43 : 18;
-            } else {
-                return (asset.round === 1) ? 40 : 15;
-            }
-
-            return value;
+            v = getDraftPickValue(asset);
+            console.log(v, "pick", asset.round, asset.season);
+            return getDraftPickValue(asset);
         } else {
             age = g.season - asset.born.year;
-            v = helpers.bound(Math.floor(asset.value / 10) * 10, 40, 80);
+            r = _.last(asset.ratings);
+            potVal = (age < 23) ? r.pot : r.ovr;
+            v = ( asset.value + 3 * potVal ) / 4;
+
+            // Adjust for age;
+            if (age < 23) {
+                v *= 1.25;
+            } else if (age < 25) {
+                v *= 1.1;
+            } else if (age >= 25 && age <= 29) {
+                v *= 1;
+            } else {
+                v *= 0.90;
+            }
+
+            v = helpers.bound(Math.floor(v / 10) * 10, 40, 80);
             v = values[v] + asset.value/100 * 10;
 
-            if (age < 21) {
-                return  v * 1.25;
-            } else if (age < 25) {
-                return v * 1.1;
-            } else if (age >= 25 && age <= 29) {
-                return v;
-            } else {
-                return v * 0.90;
-            }
+            console.log(v, asset.name, asset.value, r.ovr);
+            return v;
         }
     }
 
-    function updateLocalTeamRankings(tid) {
-        // get all teams, store standing
-        // store on localStorage
+    function updateLocalTeamRankings(teams) {
+        var i, byScore, byScore3;
+        teams = teams.slice(0);
+        teams = teams.map(function(t) {
+            var i,
+                strategy = (t.strategy === "rebuilding") ? 1 : 0,
+                s = _.last(t.seasons),
+                s3 = t.seasons.slice(-3, -1);
+            t.score = s.lost - 4 * s.playoffRoundsWon + strategy;
+            t.score3 = s3.reduce(function(a, b) {
+                return a + b.lost - 4 * s.playoffRoundsWon + strategy;
+            }, 0);
+            return t;
+        });
+        byScore = _.pluck(_.sortBy(teams, "score"), "tid");
+        byScore3 = _.pluck(_.sortBy(teams, "score3"), "tid");
+        localStorage.teamRankings = JSON.stringify(byScore);
+        localStorage.teamRankings3 = JSON.stringify(byScore3);
     }
 
     function getDraftPickValue(draftPick) {
-        // If order is already set use that instead of rankings.
-        // 1 - 1/30 * 10 (first pick is 100%)
-        // Future picks ^value * 1 + 0.2 * (pick.season - g.season)/4.
+        var rank,
+            score,
+            teamRankings = JSON.parse(localStorage.teamRankings) || [] ,
+            teamsRankings3 = JSON.parse(localStorage.teamRankings3) || [],
+            yrdiff;
+
+        yrdiff = draftPick.season - g.season;
+        if (draftPick.round === 1) {
+            if (teamRankings.indexOf(draftPick.originalTid) >= 0) {
+                rank = teamRankings.indexOf(draftPick.originalTid);
+                rank = (rank > 15) ? 35 * (rank - 15) / 14 : -15 + rank;
+                score =  35 + rank;
+            } else {
+                score = 45;
+            }
+            if (yrdiff > 0) {
+                score = (score + (yrdiff) * 45) / (yrdiff + 1);
+            }
+            return score;
+        } else {
+            if (teamRankings.indexOf(draftPick.originalTid) >= 0) {
+                rank = teamRankings.indexOf(draftPick.originalTid);
+                rank = (rank > 15) ? 4.5 * (rank - 15) / 14 : -4.5 + rank;
+                score = 15 + rank;
+            } else {
+                score = 15;
+            }
+            if (yrdiff > 0) {
+                score = (score + (yrdiff) * 15) / (yrdiff + 1);
+            }
+            return score;
+        }
     }
 
     function setTradeablePids(players, offers, tmInfo) {
@@ -1444,6 +1491,8 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "lib/bluebi
         return dao.teams.getAll()
         .then(function(teams) {
             var i, order, result, tids, tmp, tradeNego;
+
+            updateLocalTeamRankings(teams);
             if (g.autoPlaySeasons === 0) {
                 teams = teams.filter(function(t) {
                     return t.tid !== g.userTid;
