@@ -970,10 +970,10 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
                     }
 
                     if (cond.value && !cond.salary) {
-                        localAssets = localAssets.filter(function(p) {
-                            return p.hasOwnProperty('pid');
-                        })
-                        localAssets = _.sortBy(localAssets, "contract_amount");
+                        localAssets = localAssets.sort(function(a, b) {
+                            var r = b.hasOwnProperty('pid') - a.hasOwnProperty('pid');
+                            return (r === 0) ? a.contract_amount - b.contract_amount : r;
+                        });
                     }
                     console.log(JSON.stringify(_.zip(
                         _.pluck(localAssets, 'tradeValue'),
