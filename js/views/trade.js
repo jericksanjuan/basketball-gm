@@ -67,7 +67,7 @@ define(["dao", "globals", "ui", "core/player", "core/trade", "lib/bluebird", "li
     }
 
     function post(req) {
-        var askButtonEl, newOtherTid, otherDpids, otherPids, out, pid, teams, userDpids, userPids;
+        var askButtonEl, newOtherTid, otherDpids, otherPids, out, pid, reqValue, teams, userDpids, userPids;
 
         pid = req.params.pid !== undefined ? parseInt(req.params.pid, 10) : null;
         if (req.raw.abbrev !== undefined) {
@@ -84,6 +84,9 @@ define(["dao", "globals", "ui", "core/player", "core/trade", "lib/bluebird", "li
         userDpids = req.params.userDpids !== undefined && req.params.userDpids.length > 0 ? _.map(req.params.userDpids.split(","), function (x) { return parseInt(x, 10); }) : [];
         otherDpids = req.params.otherDpids !== undefined && req.params.otherDpids.length > 0 ? _.map(req.params.otherDpids.split(","), function (x) { return parseInt(x, 10); }) : [];
 
+        if (req.params.reqValue !== undefined) {
+            reqValue = parseInt(req.params.reqValue, 10);
+        }
         teams = [
             {
                 tid: g.userTid,
@@ -93,7 +96,8 @@ define(["dao", "globals", "ui", "core/player", "core/trade", "lib/bluebird", "li
             {
                 tid: newOtherTid,
                 pids: otherPids,
-                dpids: otherDpids
+                dpids: otherDpids,
+                reqValue: reqValue
             }
         ];
 
