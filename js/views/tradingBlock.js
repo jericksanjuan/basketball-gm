@@ -15,7 +15,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/b
         progressBar.style.width = "10%";
 
         // Pick 10 random teams to try
-        tids = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+        tids = _.range(30);
         random.shuffle(tids);
         tids.splice(11, 19);
 
@@ -47,7 +47,7 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/b
                 ];
 
                 if (tid !== g.userTid) {
-                    return trade.makeItWork(teams, true, estValues).spread(function (found, teams) {
+                    return trade.callEvaluateTrade(null, teams, false, true).spread(function (found, teams) {
                         // Update progress bar
                         done += 1;
                         progressBar.style.width = Math.round(10 + 90 * done / numTeams) + "%";
@@ -191,9 +191,11 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/b
             }).then(function (teams) {
                 var i, promises;
 
-                inputs.offers = _.pluck(teams, "offers").filter(function(o) {
-                    return o.tid !== g.userTid && o.pids.length || o.dpids.length;
-                });
+                if (inputs.offers.length === 0) {
+                    inputs.offers = _.pluck(teams, "offers").filter(function(o) {
+                        return o.tid !== g.userTid && o.pids.length || o.dpids.length;
+                    });
+                }
 
                 if (inputs.offers.length === 0) {
                     return {
@@ -221,7 +223,8 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/b
                             dpids: inputs.offers[i].dpids,
                             warning: inputs.offers[i].warning,
                             salarySpace: inputs.offers[i].salarySpace / 1000,
-                            rosterSpace: inputs.offers[i].rosterSpace
+                            rosterSpace: inputs.offers[i].rosterSpace,
+                            reqValue: inputs.offers[i].reqValue
                         };
 
                         promises.push(dao.players.getAll({

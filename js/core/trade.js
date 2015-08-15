@@ -794,9 +794,11 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
     /**
      * Convert from trade format to tradeNego
      */
-    function callEvaluateTrade(tx, tradeTeams, firstResult) {
+    function callEvaluateTrade(tx, tradeTeams, firstResult, tradingBlock) {
         var order;
         firstResult = firstResult || false;
+        tradingBlock = tradingBlock || false;
+
         tx = dao.tx(["teams"], "readwrite", tx);
         return Promise.map(tradeTeams, function(t) {
             return dao.teams.get({
@@ -809,13 +811,16 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
             for (i = 0; i < 2; i++) {
                 tradeNego[i].pids = tradeTeams[i].pids;
                 tradeNego[i].dpids = tradeTeams[i].dpids;
-                tradeNego[i].value = 0;
+
+                if (tradeTeams[i].hasOwnProperty('reqValue')) {
+                    tradeNego[i].reqValue = tradeTeams[i].reqValue;
+                }
             }
             order = _.pluck(tradeTeams, "tid");
             if (firstResult) {
-                return  evaluateTrade(null, tradeNego, firstResult);
+                return  evaluateTrade(null, tradeNego, firstResult, tradingBlock);
             }
-            return evaluateTrade(null, tradeNego);
+            return evaluateTrade(null, tradeNego, false, tradingBlock);
         }).then(function(result) {
             var tmp;
             // order result similar to first call.
@@ -833,10 +838,12 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
     /**
      * tradeNego: [offer1, offer2]
      */
-    function evaluateTrade(tx, tradeNego, firstResult) {
+    function evaluateTrade(tx, tradeNego, firstResult, tradingBlock) {
         var fnChangeAsset, fnEvaluateTrade, fnEvaluateStep, fnGetPlayers, fnGetDraftPicks, fnUpdateTradeValue, tids;
         tx = dao.tx(["teams", "players", "playerStats", "draftPicks", "releasedPlayers"],
             "readwrite", tx);
+
+        tradingBlock = tradingBlock || false;
 
         fnGetPlayers = function(tid) {
             return dao.players.getAll({
@@ -863,7 +870,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
                 }
                 // Remove protection on asset if maxVal of other is higher.
                 for  (i = 0; i < tradeNego.length; i++) {
-                    if (tradeNego[i].isProtected && (tradeNego[i].maxValue < tradeNego[1 - i].maxValue)) {
+                    if (tradeNego[i].isProtected && (tradeNego[i].maxValue <= tradeNego[1 - i].maxValue)) {
 
                         tradeNego[i].value /= 1000;
                     }
@@ -960,10 +967,12 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
             )));
 
             while(localAssets.length > 0 && otherAssets.length > 0) {
-                cond.value = tradeNego[1].value / tradeNego[0].value >= tradeNego[0].reqValue;
+                cond.value = tradeNego[1].value / (tradeNego[0].value / tradeNego[1].reqValue) >= tradeNego[0].reqValue;
                 cond.salary = (tradeNego[0].contract - tradeNego[1].salarySpace) / (tradeNego[1].contract || 1) < 1.25;
                 cond.salaryOther = (tradeNego[1].contract - tradeNego[0].salarySpace) / (tradeNego[0].contract || 1) < 1.25;
 
+                // console.log(JSON.stringify(tradeNego));
+                // console.log(tradeNego[1].contract, tradeNego[0].salarySpace, tradeNego[0].contract);
                 console.log(JSON.stringify(cond));
                 if (cond.value && cond.salary && (cond.salaryOther || noAddUser)) {
                     localAssets = [];
@@ -972,12 +981,14 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
 
                 if (!cond.value || !cond.salary) {
                     console.log('adjusting');
-                    if (Math.abs(tradeNego[1].value - tradeNego[0].value) < 5 && assetCount[1] > 0) {
-                        if (sort === "tradeValue") {
-                            console.log('reverse sorted', tradeNego[1].value, tradeNego[0].value);
-                            localAssets = _.sortBy(localAssets, sort);
-                        }
-                        assetInitial[1] = {players: tradeNego[1].pids.length, picks: tradeNego[1].dpids.length};
+                    if (sort === "tradeValue") {
+                        console.log('reverse sorted early', tradeNego[1].value, (tradeNego[0].value / tradeNego[1].reqValue));
+                        localAssets = localAssets.map(function(p) {
+                            var diff = Math.abs(tradeNego[1].value - (tradeNego[0].value / tradeNego[1].reqValue));
+                            p.distance = Math.abs(diff - p.tradeValue / (assetCount[1] + 1));
+                            return p;
+                        });
+                        localAssets = _.sortBy(localAssets, "distance");
                     }
 
                     if (cond.value && !cond.salary) {
@@ -1033,64 +1044,50 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
             });
             draftPicks = _.flatten(draftPicks);
 
-            tradeNego = _.sortBy(tradeNego, 'value').reverse();
-
-            result = (tradeNego[1].value / tradeNego[0].value) || 0;
-            console.log(JSON.stringify(_.zip(_.pluck(tradeNego, 'tid'), _.pluck(tradeNego, 'pids'), _.pluck(tradeNego, 'dpids'))), result);
-
-            if (g.userTid === tradeNego[0].tid && tradeNego[0].value > 0 && tradeNego[1].value > 0) {
-                console.log(JSON.stringify(tradeNego), true);
-                return [true, tradeNego];
-            }
-
-            if (result < tradeNego[0].reqValue || isNaN(result)) {
-                if (tradeNego[1].pids.length + tradeNego[1].dpids.length > 4) {
-                    console.log(JSON.stringify(tradeNego), false);
+            for (i = 0; i < tradeNego.length; i++) {
+                if (tradeNego[i].pids.length + tradeNego[i].dpids.length > 4) {
                     return [false];
                 }
-
-                assets = _.flatten(
-                    _.union(players, draftPicks)
-                )
-                .filter(function(p) {
-                    return (p.hasOwnProperty('round')) ? tradeDpids.indexOf(p.dpid) === -1 : tradePids.indexOf(p.pid) === -1;
-                }).map(function(p) {
-                    p.tradeValue = getAssetValue(p);
-                    if (p.hasOwnProperty('pid')) {
-                        p.contract_amount = p.contract.amount + p.tradeValue;
-                    } else {
-                        p.contract_amount = (p.round === 1) ? 5000 : 500;
-                        p.contract_amount += p.tradeValue;
-                    }
-                    return p;
-                });
-
-
-                players = _.object(_.pluck(players, "pid"), players);
-                draftPicks = _.object(_.pluck(draftPicks, "dpid"), draftPicks);
-
-                fnUpdateTradeValue(tradeNego, players, draftPicks);
-
-                if (firstResult) {
-                    tradeNego = _.sortBy(tradeNego, 'value');
-                    if (g.userTid === tradeNego[0].tid) {
-                        tradeNego = tradeNego.reverse();
-                    }
-                    result = (tradeNego[1].value / tradeNego[0].value) || 0;
-                    return result >= tradeNego[0].reqValue;
-                }
-
-                // Reverse if both have 0 initial value.
-                if (tradeNego[0].value  === 0) {
-                    tradeNego = tradeNego.reverse();
-                }
-                assets = assets.filter(function(p) {
-                    // Only add player of lesser trade value.
-                    return p.tradeValue <= tradeNego[0].maxValue * 1.02;
-                });
-
-                fnEvaluateStep(tradeNego, assets, players, draftPicks, tradeNego[0].tid === g.userTid && g.autoPlaySeasons === 0);
             }
+
+            // combine both teams assets and initialize tradeValue and contract_amount
+            assets = _.flatten(
+                _.union(players, draftPicks)
+            )
+            .filter(function(p) {
+                return (p.hasOwnProperty('round')) ? tradeDpids.indexOf(p.dpid) === -1 : tradePids.indexOf(p.pid) === -1;
+            }).map(function(p) {
+                p.tradeValue = getAssetValue(p);
+                if (p.hasOwnProperty('pid')) {
+                    p.contract_amount = p.contract.amount + p.tradeValue;
+                } else {
+                    p.contract_amount = (p.round === 1) ? 5000 : 500;
+                    p.contract_amount += p.tradeValue;
+                }
+                return p;
+            });
+
+            // the reference dictionary for players and objects
+            players = _.object(_.pluck(players, "pid"), players);
+            draftPicks = _.object(_.pluck(draftPicks, "dpid"), draftPicks);
+
+            // update value and contract total of offers (check if changed).
+            fnUpdateTradeValue(tradeNego, players, draftPicks);
+
+            if (firstResult) {
+                // if true, don't adjust trade further just evaluate.
+                tradeNego = _.sortBy(tradeNego, 'value').reverse();
+                result = (tradeNego[1].value / tradeNego[0].value) || 0;
+                return result >= tradeNego[0].reqValue;
+            }
+
+            tradeNego = _.sortBy(tradeNego, 'value').reverse();
+            assets = assets.filter(function(p) {
+                // Only add assets of lesser trade value.
+                return p.tradeValue <= tradeNego[0].maxValue * 1;
+            });
+
+            fnEvaluateStep(tradeNego, assets, players, draftPicks, tradeNego[0].tid === g.userTid && g.autoPlaySeasons === 0);
 
             // fail if either does not have asset to trade.
             for (i = 0; i < tradeNego.length; i++) {
@@ -1099,10 +1096,13 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
                 }
             }
             result = (tradeNego[1].value / tradeNego[0].value) || 0;
-
-            console.log(JSON.stringify(tradeNego), result >= tradeNego[0].reqValue);
+            // If trade found, match the requirement for both offer objects.
+            if (result) {
+                tradeNego[1].reqValue = (tradeNego[0].value - 1) / tradeNego[1].value;
+            }
+            console.log(g.teamAbbrevsCache[tradeNego[1].tid], JSON.stringify(tradeNego), result >= tradeNego[0].reqValue);
             console.log(tradeNego[1].priority[0], JSON.stringify(_.zip(_.pluck(tradeNego, 'tid'), _.pluck(tradeNego, 'pids'), _.pluck(tradeNego, 'dpids'))), result);
-            return [result >= tradeNego[0].reqValue || (tradeNego[0].tid === g.userTid && g.autoPlaySeasons === 0), tradeNego];
+            return [result >= tradeNego[0].reqValue || ((tradeNego[0].tid === g.userTid && g.autoPlaySeasons === 0) && !tradingBlock), tradeNego];
         };
 
         tids = _.pluck(tradeNego, "tid");
@@ -1144,9 +1144,10 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
 
     // players and draftPicks must be objects with their respective ids as keys.
     function assessTradeAssets(offer, players, draftPicks, expOnly) {
-        var i, isProtected, maxVal, out, p, value, values;
+        var i, isProtected, maxVal, out, p, salaries, value, values;
         expOnly = expOnly || false;
         values = [];
+        salaries = 0;
         isProtected = false;
         for (i = 0; i < offer.pids.length; i++) {
             p = players[offer.pids[i]];
@@ -1156,6 +1157,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
             if (offer.pidprotected.indexOf(offer.pids[i]) >= 0) {
                 isProtected = true;
             }
+            salaries += p.contract.amount;
         }
         for (i = 0; i < offer.dpids.length; i++) {
             value = getAssetValue(draftPicks[offer.dpids[i]]);
@@ -1176,6 +1178,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
             isProtected = false;
         }
         offer.isProtected = isProtected;
+        offer.contract = salaries;
         out = (isProtected) ? out *= 1000 : out;
         return out;
     }
@@ -1694,6 +1697,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
         updateTradingBlock: updateTradingBlock,
         evaluateTrade: evaluateTrade,
         tickCpuTradingDay: tickCpuTradingDay,
-        doCPUTrade: doCPUTrade
+        doCPUTrade: doCPUTrade,
+        callEvaluateTrade: callEvaluateTrade,
     };
 });
