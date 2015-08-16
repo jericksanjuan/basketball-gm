@@ -1003,7 +1003,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
                         _.pluck(localAssets, 'round')
                     )));
 
-                    tmp = fnChangeAsset(tradeNego[1], localAssets, assetCount[1], assetInitial[1], assetMax[1], players, draftPicks, cond.salaryOther);
+                    tmp = fnChangeAsset(tradeNego[1], localAssets, assetCount[1], assetInitial[1], assetMax[1], players, draftPicks, cond.salary && cond.salaryOther);
                     removed = removed.concat(tmp[0]);
                     assetCount[1] = tmp[1];
 
@@ -1017,10 +1017,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
                         _.pluck(otherAssets, 'name'),
                         _.pluck(otherAssets, 'round')
                     )));
-
-                    // if (tradeNego[1].value - tradeNego[0].value < 5 && removed.length > 0) {
-                    //     localAssets.splice(0, 0, removed.splice(0, 1));
-                    // }
 
                     tmp = fnChangeAsset(tradeNego[0], otherAssets, assetCount[0], assetInitial[0], assetMax[0], players, draftPicks, cond.salary);
                     removedOther = removedOther.concat(tmp[0]);
