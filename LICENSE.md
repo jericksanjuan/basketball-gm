@@ -6,6 +6,9 @@ Basketball GM without being able to set up competing versions of the game.
 
 # Things you are allowed to do with the source code
 
+(This is an exhaustive list! These 4 things are literally all you are allowed to
+do with the code. Nothing else is allowed.)
+
 - **View it.** No restrictions.
 
 - **Edit it.** No restrictions if it's private; if you want to share it, see
@@ -19,6 +22,10 @@ Basketball GM without being able to set up competing versions of the game.
   me, Jeremy Scheff.
 
 # Things you are not allowed to do
+
+(This is *not* an exhaustive list! These 4 things are *not* the only things you
+are not allowed to do with the code. You are only allowed to do the 4 things
+from the first section.)
 
 - **Host a version of the software that others can access.**
   <http://basketball-gm.com/> is the only publicly available version of the
