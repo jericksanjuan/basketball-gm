@@ -912,6 +912,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
                 cond = {value: false, salary: false, salaryOther: false},
                 localAssets = assets.slice(0).filter(function(p) {return p.tid === tradeNego[1].tid;}),
                 otherAssets = assets.slice(0).filter(function(p) {return p.tid === tradeNego[0].tid;}),
+                reduceReq = (noAddUser) ? random.uniform(0.1, 0.3) : 0,
                 removed = [],
                 removedOther = [],
                 sort,
@@ -967,7 +968,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
             )));
 
             while(localAssets.length > 0 && otherAssets.length > 0) {
-                cond.value = tradeNego[1].value / (tradeNego[0].value / tradeNego[1].reqValue) >= tradeNego[0].reqValue;
+                cond.value = tradeNego[1].value / tradeNego[0].value >= tradeNego[0].reqValue - reduceReq;
                 cond.salary = (tradeNego[0].contract - tradeNego[1].salarySpace) / (tradeNego[1].contract || 1) < 1.25;
                 cond.salaryOther = (tradeNego[1].contract - tradeNego[0].salarySpace) / (tradeNego[0].contract || 1) < 1.25;
 
@@ -982,9 +983,9 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
                 if (!cond.value || !cond.salary) {
                     console.log('adjusting');
                     if (sort === "tradeValue") {
-                        console.log('reverse sorted early', tradeNego[1].value, (tradeNego[0].value / tradeNego[1].reqValue));
+                        console.log('reverse sorted early', tradeNego[1].value, tradeNego[0].value);
                         localAssets = localAssets.map(function(p) {
-                            var diff = Math.abs(tradeNego[1].value - (tradeNego[0].value / tradeNego[1].reqValue));
+                            var diff = Math.abs(tradeNego[1].value - tradeNego[0].value);
                             p.distance = Math.abs(diff - p.tradeValue / (assetCount[1] + 1));
                             return p;
                         });
