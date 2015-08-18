@@ -34,6 +34,9 @@
 
 <br>
 
+<div data-bind="visible: cpuTradingBlock" class="alert alert-info" role="alert">
+  You currently have no offer for players or picks on your team. Here are some of the players and picks available to trade around the league.
+</div>
 <!--ko foreach: offers-->
   <div class="trading-block-offer">
     <h3>Offer <span data-bind="text: $index() + 1"></span>: <a data-bind="attrLeagueUrl: {href: ['roster', abbrev]}"><span data-bind="text: region"></span> <span data-bind="text: name"></span></a></h3>
