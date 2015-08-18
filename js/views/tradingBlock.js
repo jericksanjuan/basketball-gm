@@ -176,10 +176,12 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/b
     }
 
     function updateOffers(inputs, updateEvents) {
-        var offers, tx;
+        var cpuTradingBlock, offers, tx, warningMessage;
 
         if (updateEvents.indexOf("firstRun") >= 0 || updateEvents.indexOf("tradingBlockAsk") >= 0) {
             offers = [];
+            warningMessage = false;
+            cpuTradingBlock = false;
 
             tx = dao.tx(["players", "playerStats", "draftPicks", "teams"]);
 
@@ -192,9 +194,13 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/b
                 var i, promises;
 
                 if (inputs.offers.length === 0) {
+                    warningMessage = "No negotiation ongoing";
+                    cpuTradingBlock = true;
                     inputs.offers = _.pluck(teams, "offers").filter(function(o) {
                         return o.tid !== g.userTid && o.pids.length || o.dpids.length;
                     });
+                } else {
+                    cpuTradingBlock = false;
                 }
 
                 if (inputs.offers.length === 0) {
@@ -270,7 +276,9 @@ define(["dao", "globals", "ui", "core/player", "core/team", "core/trade", "lib/b
                 random.shuffle(offers);
 
                 return {
-                    offers: offers
+                    offers: offers,
+                    warningMessage: warningMessage,
+                    cpuTradingBlock: cpuTradingBlock
                 };
             });
         }

@@ -1196,22 +1196,22 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
         } else {
             age = g.season - asset.born.year;
             r = _.last(asset.ratings);
-            potVal = (age < 23) ? r.pot : r.ovr;
+            potVal = (age < 25) ? r.pot : r.ovr;
             v = ( asset.value + 3 * potVal ) / 4;
 
             v = helpers.bound(Math.floor(v / 10) * 10, 40, 80);
             v = values[v] + asset.value/100 * 10;
 
             // Adjust for age;
-            if (age < 23) {
-                v *= 1.25;
-            } else if (age < 25) {
-                v *= 1.1;
-            } else if (age >= 25 && age <= 29) {
-                v *= 1;
-            } else {
-                v *= 0.90;
-            }
+            // if (age < 23) {
+            //     v *= 1.25;
+            // } else if (age < 25) {
+            //     v *= 1.1;
+            // } else if (age >= 25 && age <= 29) {
+            //     v *= 1;
+            // } else {
+            //     v *= 0.90;
+            // }
 
             console.log(v, asset.name, asset.value, r.ovr, asset.tid);
             return v;
