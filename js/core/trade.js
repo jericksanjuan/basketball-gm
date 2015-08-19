@@ -1203,15 +1203,9 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
             v = values[v] + asset.value/100 * 10;
 
             // Adjust for age;
-            // if (age < 23) {
-            //     v *= 1.25;
-            // } else if (age < 25) {
-            //     v *= 1.1;
-            // } else if (age >= 25 && age <= 29) {
-            //     v *= 1;
-            // } else {
-            //     v *= 0.90;
-            // }
+            if (age < 23) {
+                v *= 1.05;
+            }
 
             console.log(v, asset.name, asset.value, r.ovr, asset.tid);
             return v;
