@@ -1074,6 +1074,9 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
             if (firstResult) {
                 // if true, don't adjust trade further just evaluate.
                 tradeNego = _.sortBy(tradeNego, 'value').reverse();
+                if (tradeNego[0].tid === g.userTid && g.autoPlaySeasons === 0) {
+                    return true;
+                }
                 result = (tradeNego[1].value / tradeNego[0].value) || 0;
                 return result >= tradeNego[0].reqValue;
             }
@@ -1196,7 +1199,7 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
         } else {
             age = g.season - asset.born.year;
             r = _.last(asset.ratings);
-            potVal = (age < 25) ? r.pot : r.ovr;
+            potVal = (age < 25 && g.phase > g.PHASE.PLAYOFFS) ? r.pot : r.ovr;
             v = ( asset.value + 3 * potVal ) / 4;
 
             v = helpers.bound(Math.floor(v / 10) * 10, 40, 80);
