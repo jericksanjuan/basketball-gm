@@ -201,7 +201,69 @@ define(["dao", "globals", "core/player", "core/team", "lib/bluebird", "lib/under
         return calculatePER();
     }
 
+    function cumulativePlusMinus(tid, gameCount, startIndex, fromStart, otherTid) {
+        var tx = dao.tx("games", "readwrite");
+        gameCount = gameCount || 0;
+        fromStart = fromStart || false;
+        startIndex = startIndex || 0;
+        otherTid = (otherTid > -1 && otherTid < 30) ? otherTid : 30;
+
+        return dao.games.getAll({
+            ot: tx,
+            index: "season",
+            key: g.season
+        }).then(function(games) {
+            var i, index, j, keys, players = {}, results, teams, val;
+            games = games.filter(function(gm) {
+                var teams = gm.teams;
+                if (teams.length > 1) {
+                    if (otherTid < 30) {
+                        return (teams[0].tid === tid && teams[1].tid === otherTid) ||
+                            (teams[1].tid === tid && teams[0].tid === otherTid);
+                    }
+                    return teams[0].tid === tid || teams[1].tid === tid;
+                }
+            });
+            console.log(games.length, games, otherTid);
+
+            if (gameCount > 0) {
+                if (fromStart) {
+                    games = games.slice(startIndex, startIndex + gameCount);
+                } else {
+                    if (startIndex === 0) {
+                        games = games.slice(-gameCount);
+                    } else {
+                        games = games.slice(-gameCount + startIndex, startIndex);
+                    }
+                }
+            }
+
+            for (i = 0; i < games.length; i++) {
+                teams = games[i].teams;
+                index = (teams[0].tid === tid) ? 0 : 1;
+                teams[index].players.map(function(p) {
+                    if (players.hasOwnProperty(p.name)) {
+                        players[p.name].pm += p.pm;
+                        players[p.name].min += p.min;
+                    } else {
+                        players[p.name] = {
+                            pm: p.pm,
+                            min: p.min
+                        }
+                    }
+                });
+            }
+
+            keys = _.keys(players);
+            for (i = 0; i < keys.length; i++ ) {
+                val = players[keys[i]];
+                console.log('pm', val.pm, keys[i], 'mins', val.min);
+            }
+        });
+    }
+
     return {
-        calculateAll: calculateAll
+        calculateAll: calculateAll,
+        cumulativePlusMinus: cumulativePlusMinus
     };
 });
