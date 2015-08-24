@@ -134,7 +134,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
      * @param {boolean} randomizeExp If true, then it is assumed that some random amount of years has elapsed since the contract was signed, thus decreasing the expiration date. This is used when generating players in a new league.
      * @return {Object.<string, number>} Object containing two properties with integer values, "amount" with the contract amount in thousands of dollars and "exp" with the contract expiration year.
      */
-    function genContract(p, randomizeExp, randomizeAmount, noLimit) {
+    function genContract(p, randomizeExp, randomizeAmount, noLimit, forSeason) {
         var amount, age, expiration, maxAmount, minAmount, proExp, potentialDifference,
             ratings, years;
 
@@ -143,15 +143,16 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
         randomizeExp = randomizeExp !== undefined ? randomizeExp : false;
         randomizeAmount = randomizeAmount !== undefined ? randomizeAmount : true;
         noLimit = noLimit !== undefined ? noLimit : false;
+        forSeason = forSeason !== undefined ? forSeason : g.season;
 
         // Limits on yearly contract amount, in $1000's
         minAmount = g.minContract;
         maxAmount = g.maxContract;
 
         // If already a vet, adjust min and max contract based on experience.
-        proExp = g.season - p.draft.year;
+        proExp = forSeason - p.draft.year;
         if (p.draft.year < g.season) {
-            age = g.season - p.born.year;
+            age = forSeason - p.born.year;
 
             if (proExp <= 4) {
                 maxAmount *= 0.725;  // min: 500, max: 14500
