@@ -425,7 +425,7 @@ define(["dao", "globals", "ui", "core/contractNegotiation", "core/draft", "core/
             return team.updateCPUBudget(tx);
         }).then(function(informUser) {
             if (informUser !== 0) {
-                message.budgetChanged(tx, 1);
+                message.budgetChanged(tx, informUser);
             }
         }).then(function() {
             return finances.updateRanks(tx, ["budget"]);
