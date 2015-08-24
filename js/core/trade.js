@@ -778,6 +778,15 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
                     if (g.userTids.indexOf(tids[1]) < 0) {
                         return team.rosterAutoSort(null, tids[1]);
                     }
+                })
+                .then(function() {
+                    if (freeAgents.hasOwnProperty("readyTeamsFA")) {
+                        return freeAgents.readyTeamsFA(null, tids)
+                        .then(function() {
+                            return updateTradingBlock(null, true, tids, true);
+                        });
+                    }
+                    return updateTradingBlock(null, true, tids, true);
                 }).then(function () {
                     return [true, 'Trade accepted! "Nice doing business with you!"'];
                 });
@@ -1192,6 +1201,10 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
             50: 10,
             40: 1,
         };
+        if (!asset) {
+            return 0;
+        }
+
         if (asset.hasOwnProperty('dpid')) {
             v = getDraftPickValue(asset);
             console.log(v, "pick", asset.round, asset.season, asset.tid);
@@ -1581,14 +1594,6 @@ define(["dao", "globals", "core/league", "core/player", "core/team", "core/freeA
                             if (tradeResult[0]) {
                                 tids = _.pluck(result[1], 'tid');
                                 console.log("cpu trade success", g.teamAbbrevsCache[tids[0]], g.teamAbbrevsCache[tids[1]]);
-
-                                if (freeAgents.hasOwnProperty("readyTeamsFA")) {
-                                    return freeAgents.readyTeamsFA(null, tids)
-                                    .then(function() {
-                                        updateTradingBlock(null, true, tids, true);
-                                    });
-                                }
-                                updateTradingBlock(null, true, tids, true);
                             } else {
                                 console.log('trade failed');
                             }
