@@ -210,7 +210,7 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
             }
         }
 
-        expiration = g.season + years - 1;
+        expiration = forSeason + years - 1;
 
         if (!noLimit) {
             if (amount < minAmount * 1.1) {
