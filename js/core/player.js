@@ -151,8 +151,9 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
 
         // If already a vet, adjust min and max contract based on experience.
         proExp = forSeason - p.draft.year;
-        if (p.draft.year < g.season) {
+        if (p.draft.year < forSeason) {
             age = forSeason - p.born.year;
+            console.log(p.name, proExp, age);
 
             if (proExp <= 4) {
                 maxAmount *= 0.725;  // min: 500, max: 14500
