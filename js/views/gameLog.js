@@ -155,7 +155,6 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/jquery", "lib/knockout", "v
             });
         }
         if (gid >= 0) {
-            console.log('here again');
             return dao.games.get({key: gid}).then(function (game) {
                 var i, t;
 
@@ -317,8 +316,6 @@ define(["dao", "globals", "ui", "lib/bluebird", "lib/jquery", "lib/knockout", "v
      * @param {number} inputs.gid Integer game ID for the box score (a negative number means no box score).
      */
     function updateBoxScore(inputs, updateEvents, vm) {
-        console.log(inputs);
-        console.log(vm);
         if (updateEvents.indexOf("dbChange") >= 0 || updateEvents.indexOf("firstRun") >= 0 || inputs.gid !== vm.boxScore.gid() || inputs.opponent !== vm.opponent() || inputs.gameCount !== vm.gameCount() || inputs.season !== vm.season()) {
             return boxScore(inputs, vm).then(function (game) {
                 var vars;
