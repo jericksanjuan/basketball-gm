@@ -57,6 +57,27 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "util/helpers"], function
                         options[j + 1].key = g.teamAbbrevsCache[j];
                         options[j + 1].val = g.teamRegionsCache[j] + " " + g.teamNamesCache[j];
                     }
+                } else if (fields[i] === "opponent") {
+                    options = [{
+                        key: "all",
+                        val: "vs: All Teams"
+                    }];
+                    for (j = 0; j < g.numTeams; j++) {
+                        options[j + 1] = {};
+                        options[j + 1].key = g.teamAbbrevsCache[j];
+                        options[j + 1].val = "vs: " + g.teamRegionsCache[j] + " " + g.teamNamesCache[j];
+                    }
+                } else if (fields[i] === "gameCount") {
+                    options = [{
+                        key: "all",
+                        val: "All Games"
+                    }];
+                    for (j = 0; j < 12; j++) {
+                        options[j + 1] = {};
+                        options[j + 1].key = j + 1;
+
+                        options[j + 1].val = "Last " + String(j + 1);
+                    }
                 } else if (fields[i] === "seasons" || fields[i] === "seasonsAndCareer" || fields[i] === "seasonsAndAll") {
                     options = helpers.getSeasons();
                     for (j = 0; j < options.length; j++) {
