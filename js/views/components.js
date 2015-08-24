@@ -69,6 +69,7 @@ define(["globals", "ui", "lib/jquery", "lib/knockout", "util/helpers"], function
                         options[j + 2] = {};
                         options[j + 2].key = g.teamAbbrevsCache[j];
                         options[j + 2].val = g.teamRegionsCache[j] + " " + g.teamNamesCache[j];
+                    }
                 } else if (fields[i] === "opponent") {
                     options = [{
                         key: "all",
