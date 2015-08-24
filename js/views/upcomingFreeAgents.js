@@ -48,13 +48,13 @@ define(["dao", "globals", "ui", "core/player", "lib/jquery", "lib/knockout", "li
 
             // Done before filter so full player object can be passed to player.genContract.
             for (i = 0; i < players.length; i++) {
-                players[i].contractDesired = player.genContract(players[i], false, false); // No randomization
+                players[i].contractDesired = player.genContract(players[i], false, false, false, inputs.season); // No randomization
                 players[i].contractDesired.amount /= 1000;
                 players[i].contractDesired.exp += inputs.season - g.season;
             }
 
             players = player.filter(players, {
-                attrs: ["pid", "name", "age", "contract", "freeAgentMood", "injury", "watch", "contractDesired"],
+                attrs: ["pid", "abbrev", "name", "age", "contract", "freeAgentMood", "injury", "watch", "contractDesired"],
                 ratings: ["ovr", "pot", "skills", "pos"],
                 stats: ["min", "pts", "trb", "ast", "per"],
                 season: g.season,
@@ -77,7 +77,7 @@ define(["dao", "globals", "ui", "core/player", "lib/jquery", "lib/knockout", "li
         ko.computed(function () {
             ui.datatable($("#upcoming-free-agents"), 4, _.map(vm.players(), function (p) {
                 // The display: none for mood allows sorting, somehow
-                return [helpers.playerNameLabels(p.pid, p.name, p.injury, p.ratings.skills, p.watch), p.ratings.pos, String(p.age), String(p.ratings.ovr), String(p.ratings.pot), helpers.round(p.stats.min, 1), helpers.round(p.stats.pts, 1), helpers.round(p.stats.trb, 1), helpers.round(p.stats.ast, 1), helpers.round(p.stats.per, 1), helpers.formatCurrency(p.contract.amount, "M") + ' thru ' + p.contract.exp, helpers.formatCurrency(p.contractDesired.amount, "M") + ' thru ' + p.contractDesired.exp];
+                return [helpers.playerNameLabels(p.pid, p.name, p.injury, p.ratings.skills, p.watch), p.abbrev, p.ratings.pos, String(p.age), String(p.ratings.ovr), String(p.ratings.pot), helpers.round(p.stats.min, 1), helpers.round(p.stats.pts, 1), helpers.round(p.stats.trb, 1), helpers.round(p.stats.ast, 1), helpers.round(p.stats.per, 1), helpers.formatCurrency(p.contract.amount, "M") + ' thru ' + p.contract.exp, helpers.formatCurrency(p.contractDesired.amount, "M") + ' thru ' + p.contractDesired.exp];
             }));
         }).extend({throttle: 1});
 
