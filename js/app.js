@@ -244,6 +244,7 @@ require(["db", "views", "ui", "data/changes", "lib/davis", "util/account", "util
             this.get("/l/:lid/game_log/:abbrev/:season", views.gameLog.get);
             this.get("/l/:lid/game_log/:abbrev/:season/:gid", views.gameLog.get);
             this.get("/l/:lid/game_log/:abbrev/:season/:gid/:view", views.gameLog.get);
+            this.get("/l/:lid/game_log/:abbrev/:season/:opponent/:gameCount", views.gameLog.get);
             this.get("/l/:lid/leaders", views.leaders.get);
             this.get("/l/:lid/leaders/:season", views.leaders.get);
             this.get("/l/:lid/player_ratings", views.playerRatings.get);
