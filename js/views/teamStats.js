@@ -30,7 +30,8 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
             return team.filter({
                 attrs: ["abbrev"],
                 seasonAttrs: ["won", "lost"],
-                stats: ["gp", "fg", "fga", "fgp", "tp", "tpa", "tpp", "ft", "fta", "ftp", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "ba", "pf", "pts", "oppPts", "diff"],
+                stats: ["gp", "fg", "fga", "fgp", "tp", "tpa", "tpp", "ft", "fta", "ftp", "orb", "drb", "trb", "ast", "tov", "stl", "blk", "ba", "pf", "pts", "oppPts", "diff",
+                    "pace", "ortg", "drtg", "netrtg", "efg", "tovp", "orbp", "ftpa", "oppEfg", "oppTovp", "oppOrbp", "oppFtpa", "tpar"],
                 // oppStats: ["trb", "tov"],
                 season: inputs.season
             }).then(function (teams) {
@@ -40,6 +41,20 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
                 };
             });
         }
+    }
+
+    function getRank(value, values, reverse) {
+        var rank;
+        console.log(values);
+        values.sort(function(a, b) {
+            if (reverse) {
+                return a - b;
+            } else {
+                return b - a;
+            }
+        });
+        rank = values.indexOf(value) + 1;
+        return helpers.round(value, 1) + " <small>(" + rank + ")</small>";
     }
 
     function uiFirst(vm) {
@@ -62,9 +77,14 @@ define(["globals", "ui", "core/team", "lib/jquery", "lib/knockout", "lib/undersc
                     }
                 }
             });
+            ui.datatableSinglePage($("#team-adv-stats"), 2, _.map(vm.teams(), function (t, k, teams) {
+                return ['<a href="' + helpers.leagueUrl(["roster", t.abbrev, season]) + '">' + t.abbrev + '</a>', helpers.round(t.pace, 1), helpers.round(t.ortg, 1), helpers.round(t.drtg, 1), helpers.round(t.netrtg, 1), helpers.round(t.efg, 1), helpers.round(t.tovp, 1), helpers.round(t.orbp, 1), helpers.round(t.ftpa, 1), helpers.round(t.oppEfg, 1), helpers.round(t.oppTovp, 1), helpers.round(t.oppOrbp, 1), helpers.round(t.oppFtpa, 1), helpers.round(t.tpar, 1)
+                ];
+            }));
         }).extend({throttle: 1});
 
         ui.tableClickableRows($("#team-stats"));
+        ui.tableClickableRows($("#team-adv-stats"));
     }
 
     function uiEvery(updateEvents, vm) {
