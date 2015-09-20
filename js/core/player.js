@@ -410,12 +410,14 @@ define(["dao", "globals", "core/finances", "data/injuries", "data/names", "lib/b
             // Ratings that can only increase a little, and only when young. Decrease when old.
             ratingKeys = ["spd", "jmp", "endu"];
             for (j = 0; j < ratingKeys.length; j++) {
-                if (age <= 24) {
-                    baseChangeLocal = baseChange;
+                if (age <= 25) {
+                    baseChangeLocal = helpers.bound(baseChange, -0.60, 5.30);
                 } else if (age <= 30) {
-                    baseChangeLocal = baseChange - 1;
+                    baseChangeLocal = helpers.bound(baseChange - 1, -0.60, 0.60);
+                    // baseChangeLocal = baseChange - 1;
                 } else {
-                    baseChangeLocal = baseChange - 2.5;
+                    baseChangeLocal = helpers.bound(baseChange - 2.5, (age - 30) * -4, 0.60);
+                    // baseChangeLocal = baseChange - 2.5;
                 }
                 p.ratings[r][ratingKeys[j]] = limitRating(p.ratings[r][ratingKeys[j]] + helpers.bound(baseChangeLocal * random.uniform(0.5, 1.5), -20, 10));
             }
