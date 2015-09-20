@@ -21,7 +21,7 @@ define(["dao", "globals", "ui", "core/team", "lib/bluebird", "lib/jquery", "lib/
                 team.filter({
                     attrs: ["tid", "abbrev", "region", "name"],
                     seasonAttrs: ["won", "lost", "lastTen"],
-                    stats: ["gp", "pts", "oppPts", "diff"],
+                    stats: ["gp", "pts", "oppPts", "diff", "ortg", "drtg", "netrtg"],
                     season: g.season
                 }),
                 dao.players.getAll({
@@ -60,7 +60,7 @@ define(["dao", "globals", "ui", "core/team", "lib/bluebird", "lib/jquery", "lib/
                 for (i = 0; i < g.numTeams; i++) {
                     playerValuesByTid[i] = [];
                     // Modulate point differential by recent record: +5 for 10-0 in last 10 and -5 for 0-10
-                    teams[i].performance = teams[i].diff - 5 + 5 * (parseInt(teams[i].lastTen.split("-")[0], 10)) / 10;
+                    teams[i].performance = teams[i].netrtg - 5 + 5 * (parseInt(teams[i].lastTen.split("-")[0], 10)) / 10;
                 }
 
                 // RANKS
@@ -103,7 +103,7 @@ define(["dao", "globals", "ui", "core/team", "lib/bluebird", "lib/jquery", "lib/
             ui.datatableSinglePage($("#power-rankings"), 0, _.map(vm.teams(), function (t) {
                 var performanceRank;
                 performanceRank = t.gp > 0 ? String(t.performanceRank) : "-";
-                return [String(t.overallRank), performanceRank, String(t.talentRank), '<a href="' + helpers.leagueUrl(["roster", t.abbrev]) + '">' + t.region + ' ' + t.name + '</a>', String(t.won), String(t.lost), t.lastTen, helpers.round(t.diff, 1), t.tid === g.userTid];
+                return [String(t.overallRank), performanceRank, String(t.talentRank), '<a href="' + helpers.leagueUrl(["roster", t.abbrev]) + '">' + t.region + ' ' + t.name + '</a>', String(t.won), String(t.lost), t.lastTen, helpers.round(t.netrtg, 1), t.tid === g.userTid];
             }), {
                 rowCallback: function (row, data) {
                     // Show point differential in green or red for positive or negative

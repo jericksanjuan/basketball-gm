@@ -648,6 +648,35 @@ define(["dao", "globals", "core/player", "lib/bluebird", "lib/underscore", "util
                         ft.diff = ft.pts - ft.oppPts;
                     } else if (stats[j] === "season") {
                         ft.season = s.season;
+                    } else if (stats[j] === "ortg") {
+                        s.poss = s.fga + 0.44 * s.fta + s.tov - s.orb;
+                        ft.ortg = 100 * (s.pts / s.poss);
+                    } else if (stats[j] === "drtg") {
+                        s.oppPoss = s.oppStats.fga + 0.44 * s.oppStats.fta + s.oppStats.tov - s.oppStats.orb;
+                        ft.drtg = 100 * (s.oppStats.pts / s.oppPoss);
+                    } else if (stats[j] === "netrtg") {
+                        ft.netrtg = ft.ortg - ft.drtg;
+                    } else if (stats[j] === "efg") {
+                        ft.efg = 100 * (s.fg + 0.5 * s.tp) / s.fga;
+                    } else if (stats[j] === "tovp") {
+                        ft.tovp = 100 * s.tov / (s.fga + 0.44 * s.fta + s.tov);
+                    } else if (stats[j] === "orbp") {
+                        ft.orbp = 100 * s.orb / (s.orb + s.oppStats.drb);
+                    } else if (stats[j] === "ftpa") {
+                        ft.ftpa = 100 * s.ft / s.fga;
+                    } else if (stats[j] === "oppEfg") {
+                        ft.oppEfg = 100 * (s.oppStats.fg + 0.5 * s.oppStats.tp) / s.oppStats.fga;
+                    } else if (stats[j] === "oppTovp") {
+                        ft.oppTovp = 100 * s.oppStats.tov / (s.oppStats.fga + 0.44 * s.oppStats.fta + s.oppStats.tov);
+                    } else if (stats[j] === "oppOrbp") {
+                        ft.oppOrbp = 100 * s.oppStats.orb / (s.oppStats.orb + s.drb);
+                    } else if (stats[j] === "oppFtpa") {
+                        ft.oppFtpa = 100 * s.oppStats.ft / s.oppStats.fga;
+                    } else if (stats[j] === "tpar") {
+                        ft.tpar = 100 * s.tpa / s.fga;
+                    } else if (stats[j] === "pace") {
+                        s.poss = s.fga + 0.44 * s.fta + s.tov - s.orb;
+                        ft.pace = 48 / (s.min / 5) * s.poss;
                     } else {
                         if (options.totals) {
                             ft[stats[j]] = s[stats[j]];

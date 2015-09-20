@@ -97,6 +97,7 @@ define(["dao", "globals", "core/player", "core/team", "lib/bluebird", "lib/under
         return team.filter({
             attrs: ["tid", "abbrev", "region", "name", "cid"],
             seasonAttrs: ["won", "lost", "winp", "playoffRoundsWon"],
+            stats: ["drtg"],
             season: g.season,
             sortBy: "winp",
             ot: tx
@@ -129,7 +130,7 @@ define(["dao", "globals", "core/player", "core/team", "lib/bluebird", "lib/under
                 statsSeasons: [g.season]
             })];
         }).spread(function (teams, players) {
-            var champTid, i, p, rookies, type;
+            var champTid, dratings, i, p, rookies, type;
 
             players = player.filter(players, {
                 attrs: ["pid", "name", "tid", "abbrev", "draft"],
@@ -137,13 +138,20 @@ define(["dao", "globals", "core/player", "core/team", "lib/bluebird", "lib/under
                 season: g.season
             });
 
+            dratings = _.pluck(teams, 'drtg');
+            dratings.sort(function(a, b) {
+                return b - a;
+            });
+
             // Add team games won to players
             for (i = 0; i < players.length; i++) {
                 // Special handling for players who were cut mid-season
                 if (players[i].tid >= 0) {
                     players[i].won = teams[players[i].tid].won;
+                    players[i].drtg = teams[players[i].tid].drtg;
                 } else {
                     players[i].won = 20;
+                    players[i].drtg = _.max(dratings);
                 }
             }
 
@@ -152,6 +160,11 @@ define(["dao", "globals", "core/player", "core/team", "lib/bluebird", "lib/under
                 // This doesn't factor in players who didn't start playing right after being drafted, because currently that doesn't really happen in the game.
                 return p.draft.year === g.season - 1;
             }).sort(function (a, b) { return b.stats.ewa - a.stats.ewa; }); // Same formula as MVP, but no wins because some years with bad rookie classes can have the wins term dominate EWA
+            if (rookies.length === 0) {
+                rookies = players.filter(function (p) {
+                    return p.draft.year === g.season - 2;
+                }).sort(function (a, b) { return b.stats.ewa - a.stats.ewa; });
+            }
             p = rookies[0];
             if (p !== undefined) { // I suppose there could be no rookies at all.. which actually does happen when skip the draft from the debug menu
                 awards.roy = {pid: p.pid, name: p.name, tid: p.tid, abbrev: p.abbrev, pts: p.stats.pts, trb: p.stats.trb, ast: p.stats.ast};
@@ -202,7 +215,10 @@ define(["dao", "globals", "core/player", "core/team", "lib/bluebird", "lib/under
             }
 
             // Defensive Player of the Year
-            players.sort(function (a, b) { return b.stats.gp * (b.stats.trb + 5 * b.stats.blk + 5 * b.stats.stl) - a.stats.gp * (a.stats.trb + 5 * a.stats.blk + 5 * a.stats.stl); });
+            players.sort(function (a, b) {
+                return (7 * dratings.indexOf(b.drtg) + 3 * 0.1 * b.stats.gp * (b.stats.trb + 5 * b.stats.blk + 5 * b.stats.stl)) / 10 -
+                    (7 * dratings.indexOf(a.drtg) + 3 * 0.1 * a.stats.gp * (a.stats.trb + 5 * a.stats.blk + 5 * a.stats.stl)) / 10;
+            });
             p = players[0];
             awards.dpoy = {pid: p.pid, name: p.name, tid: p.tid, abbrev: p.abbrev, trb: p.stats.trb, blk: p.stats.blk, stl: p.stats.stl};
             awardsByPlayer.push({pid: p.pid, tid: p.tid, name: p.name, type: "Defensive Player of the Year"});
@@ -212,6 +228,11 @@ define(["dao", "globals", "core/player", "core/team", "lib/bluebird", "lib/under
             type = "First Team All-Defensive";
             for (i = 0; i < 15; i++) {
                 p = players[i];
+                // console.log(p.name,
+                //     (7 * dratings.indexOf(p.drtg) + 3 * 0.1 * p.stats.gp * (p.stats.trb + 5 * p.stats.blk + 5 * p.stats.stl)) / 10,
+                //     dratings.indexOf(p.drtg),
+                //     p.stats.gp * (p.stats.trb + 5 * p.stats.blk + 5 * p.stats.stl)
+                // );
                 if (i === 5) {
                     awards.allDefensive.push({title: "Second Team", players: []});
                     type = "Second Team All-Defensive";
