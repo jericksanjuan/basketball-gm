@@ -436,12 +436,17 @@ async function newPhaseFreeAgency(tx: BackboardTx) {
 
     // AI teams re-sign players or they become free agents
     // Run this after upding contracts for current free agents, or addToFreeAgents will be called twice for these guys
-    await tx.players.index('tid').iterate(backboard.lowerBound(0), p => {
+    await tx.players.index('tid').iterate(backboard.lowerBound(0), async p => {
         if (p.contract.exp <= g.season && (!g.userTids.includes(p.tid) || g.autoPlaySeasons > 0)) {
             // Automatically negotiate with teams
             const factor = strategies[p.tid] === "rebuilding" ? 0.4 : 0;
 
-            if (Math.random() < p.value / 100 - factor) { // Should eventually be smarter than a coin flip
+            // Team will keep good first rounders
+            const playerStats = await tx.playerStats.index("pid, season, tid").getAll(backboard.bound([p.pid, g.season], [p.pid, g.season + 1]));
+            const ewa = playerStats.reduce((acc, ps) => acc + ps.ewa, 0);
+            const isFirstRounder = p.draft.round === 1 && p.draft.year === g.season - 3;
+
+            if ((Math.random() < p.value / 100 - factor) || (isFirstRounder && ewa > 1)) { // Should eventually be smarter than a coin flip
                 // See also core.team
                 const contract = player.genContract(p);
                 contract.exp += 1; // Otherwise contracts could expire this season
@@ -548,7 +553,7 @@ async function newPhase(phase: Phase, extra: any) {
             func: newPhaseResignPlayers,
         },
         [g.PHASE.FREE_AGENCY]: {
-            objectStores: ["gameAttributes", "messages", "negotiations", "players", "teams", "teamSeasons", "teamStats"],
+            objectStores: ["gameAttributes", "messages", "negotiations", "players", "teams", "teamSeasons", "teamStats", "playerStats"],
             func: newPhaseFreeAgency,
         },
         [g.PHASE.FANTASY_DRAFT]: {
