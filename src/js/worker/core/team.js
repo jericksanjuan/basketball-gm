@@ -142,6 +142,13 @@ function genStatsRow(tid: number, playoffs?: boolean = false): TeamStats {
 }
 
 /**
+ * Round budge value
+ */
+function roundBudget(val) {
+    return Math.round(val * 1000 / 10) * 10;
+}
+
+/**
  * Create a new team object.
  *
  * @memberOf core.team
@@ -170,19 +177,19 @@ function generate(tm: any) {
                 rank: tm.hasOwnProperty("budget") ? tm.budget.ticketPrice.rank : tm.popRank,
             },
             scouting: {
-                amount: tm.hasOwnProperty("budget") ? tm.budget.scouting.amount : Math.round((g.salaryCap / 90000) * 1350 + 900 * (g.numTeams - tm.popRank) / (g.numTeams - 1)) * 10,
+                amount: tm.hasOwnProperty("budget") ? tm.budget.scouting.amount : roundBudget(random.realGauss(14, 1)),
                 rank: tm.hasOwnProperty("budget") ? tm.budget.scouting.rank : tm.popRank,
             },
             coaching: {
-                amount: tm.hasOwnProperty("budget") ? tm.budget.coaching.amount : Math.round((g.salaryCap / 90000) * 1350 + 900 * (g.numTeams - tm.popRank) / (g.numTeams - 1)) * 10,
+                amount: tm.hasOwnProperty("budget") ? tm.budget.coaching.amount : roundBudget(random.realGauss(16, 3)),
                 rank: tm.hasOwnProperty("budget") ? tm.budget.coaching.rank : tm.popRank,
             },
             health: {
-                amount: tm.hasOwnProperty("budget") ? tm.budget.health.amount : Math.round((g.salaryCap / 90000) * 1350 + 900 * (g.numTeams - tm.popRank) / (g.numTeams - 1)) * 10,
+                amount: tm.hasOwnProperty("budget") ? tm.budget.health.amount : roundBudget(random.realGauss(14, 1)),
                 rank: tm.hasOwnProperty("budget") ? tm.budget.health.rank : tm.popRank,
             },
             facilities: {
-                amount: tm.hasOwnProperty("budget") ? tm.budget.facilities.amount : Math.round((g.salaryCap / 90000) * 1350 + 900 * (g.numTeams - tm.popRank) / (g.numTeams - 1)) * 10,
+                amount: tm.hasOwnProperty("budget") ? tm.budget.facilities.amount : roundBudget(random.realGauss(16, 1)),
                 rank: tm.hasOwnProperty("budget") ? tm.budget.facilities.rank : tm.popRank,
             },
         },
@@ -827,6 +834,23 @@ console.log(dv);*/
 }
 
 /**
+ * Update AI-team budget based on strategy
+ */
+function updateBudget(t) {
+    if (t.strategy === 'contending') {
+        // Improve spending on health and facilities
+        t.budget.health.amount += roundBudget(random.realGauss(2, 1));
+        t.budget.facilities.amount += roundBudget(random.realGauss(2, 1));
+    } else if (t.strategy === 'rebuilding') {
+        // Major makeover of staff/spending
+        t.budget.coaching.amount = roundBudget(random.realGauss(16, 3));
+        t.budget.scouting.amount = roundBudget(random.realGauss(14, 1));
+        t.budget.health.amount = roundBudget(random.realGauss(14, 1));
+        t.budget.facilities.amount = roundBudget(random.realGauss(16, 1));
+    }
+}
+
+/**
  * Update team strategies (contending or rebuilding) for every team in the league.
  *
  * Basically.. switch to rebuilding if you're old and your success is fading, and switch to contending if you have a good amount of young talent on rookie deals and your success is growing.
@@ -885,6 +909,7 @@ async function updateStrategies() {
         }
 
         if (updated) {
+            updateBudget(t);
             await idb.cache.teams.put(t);
         }
     }

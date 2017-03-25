@@ -331,6 +331,7 @@ async function newPhaseBeforeDraft(conditions: Conditions, liveGameSim?: boolean
     }
 
     await team.updateStrategies();
+    await finances.updateRanks(["budget"]);
 
     // Achievements after awards
     account.checkAchievement.hardware_store(conditions);

@@ -222,6 +222,9 @@ async function create(
             scoutingRankTemp = finances.getRankLastThree(teamSeasons, "expenses", "scouting");
         }
     }
+
+    await finances.updateRanks(["budget"]);
+
     const scoutingRank = scoutingRankTemp;
     if (scoutingRank === undefined) {
         throw new Error('scoutingRank should be defined');
