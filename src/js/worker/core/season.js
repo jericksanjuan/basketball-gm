@@ -186,7 +186,8 @@ async function doAwards(conditions: Conditions) {
         }
     }
 
-    // Sixth Man of the Year - same sort as MVP, must have come off the bench in most games
+    // Sixth Man of the Year, must have come off the bench in most games
+    players.sort((a, b) => (b.stats.ewa) - (a.stats.ewa));
     {
         const p = players.find(p2 => p2.stats.gs === 0 || p2.stats.gp / p2.stats.gs > 2);
         if (p) {
@@ -212,7 +213,7 @@ async function doAwards(conditions: Conditions) {
     }
 
     // Defensive Player of the Year
-    players.sort((a, b) => b.stats.gp * (b.stats.trb + 5 * b.stats.blk + 5 * b.stats.stl + 0.1 * (100 - b.oppPts)) - a.stats.gp * (a.stats.trb + 5 * a.stats.blk + 5 * a.stats.stl + 0.1 * (100 - a.oppPts)));
+    players.sort((a, b) => b.stats.gp * (b.stats.trb + 5 * b.stats.blk + 5 * b.stats.stl + 1 * (100 - b.oppPts)) - a.stats.gp * (a.stats.trb + 5 * a.stats.blk + 5 * a.stats.stl + 1 * (100 - a.oppPts)));
     {
         const p = players[0];
         awards.dpoy = {pid: p.pid, name: p.name, tid: p.tid, abbrev: p.abbrev, trb: p.stats.trb, blk: p.stats.blk, stl: p.stats.stl};
