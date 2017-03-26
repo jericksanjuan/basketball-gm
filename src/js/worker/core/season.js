@@ -87,6 +87,7 @@ async function doAwards(conditions: Conditions) {
     const teams = helpers.orderByWinp(await idb.getCopies.teamsPlus({
         attrs: ["tid", "abbrev", "region", "name", "cid"],
         seasonAttrs: ["won", "lost", "winp", "playoffRoundsWon"],
+        stats: ["oppPts"],
         season: g.season,
     }));
 
@@ -117,6 +118,7 @@ async function doAwards(conditions: Conditions) {
     players = await idb.getCopies.playersPlus(players, {
         attrs: ["pid", "name", "tid", "abbrev", "draft"],
         stats: ["gp", "gs", "min", "pts", "trb", "ast", "blk", "stl", "ewa"],
+        ratings: ["pos"],
         season: g.season,
     });
 
@@ -144,8 +146,10 @@ async function doAwards(conditions: Conditions) {
         // Special handling for players who were cut mid-season
         if (players[i].tid > 0) {
             players[i].won = teams[players[i].tid].seasonAttrs.won;
+            players[i].oppPts = teams[players[i].tid].stats.oppPts;
         } else {
             players[i].won = 20;
+            players[i].oppPts = 100;
         }
     }
 
@@ -167,7 +171,7 @@ async function doAwards(conditions: Conditions) {
     for (let i = 0; i < 5; i++) {
         const p = rookies[i];
         if (p) {
-            awards.allRookie.push({pid: p.pid, name: p.name, tid: p.tid, abbrev: p.abbrev, pts: p.stats.pts, trb: p.stats.trb, ast: p.stats.ast});
+            awards.allRookie.push({pid: p.pid, name: p.name, tid: p.tid, abbrev: p.abbrev, pts: p.stats.pts, trb: p.stats.trb, ast: p.stats.ast, pos: p.ratings.pos});
             awardsByPlayer.push({pid: p.pid, tid: p.tid, name: p.name, type: "All Rookie Team"});
         }
     }
@@ -203,12 +207,12 @@ async function doAwards(conditions: Conditions) {
             awards.allLeague.push({title: "Third Team", players: []});
             type = "Third Team All-League";
         }
-        _.last(awards.allLeague).players.push({pid: p.pid, name: p.name, tid: p.tid, abbrev: p.abbrev, pts: p.stats.pts, trb: p.stats.trb, ast: p.stats.ast});
+        _.last(awards.allLeague).players.push({pid: p.pid, name: p.name, tid: p.tid, abbrev: p.abbrev, pts: p.stats.pts, trb: p.stats.trb, ast: p.stats.ast, pos: p.ratings.pos});
         awardsByPlayer.push({pid: p.pid, tid: p.tid, name: p.name, type});
     }
 
     // Defensive Player of the Year
-    players.sort((a, b) => b.stats.gp * (b.stats.trb + 5 * b.stats.blk + 5 * b.stats.stl) - a.stats.gp * (a.stats.trb + 5 * a.stats.blk + 5 * a.stats.stl));
+    players.sort((a, b) => b.stats.gp * (b.stats.trb + 5 * b.stats.blk + 5 * b.stats.stl + 0.1 * (100 - b.oppPts)) - a.stats.gp * (a.stats.trb + 5 * a.stats.blk + 5 * a.stats.stl + 0.1 * (100 - a.oppPts)));
     {
         const p = players[0];
         awards.dpoy = {pid: p.pid, name: p.name, tid: p.tid, abbrev: p.abbrev, trb: p.stats.trb, blk: p.stats.blk, stl: p.stats.stl};
@@ -216,19 +220,47 @@ async function doAwards(conditions: Conditions) {
     }
 
     // All Defensive Team - same sort as DPOY
+    const dselect = [];
+    let numG = 0;
+    let numFC = 0;
+
     awards.allDefensive = [{title: "First Team", players: []}];
     type = "First Team All-Defensive";
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < players.length - 1; i++) {
         const p = players[i];
-        if (i === 5) {
+        let isGuard = p.ratings.pos.includes('G');
+        if (isGuard && numG > 0 && p.ratings.pos.includes('F')) {
+            isGuard = false;
+        }
+        if (dselect.length === 5) {
             awards.allDefensive.push({title: "Second Team", players: []});
             type = "Second Team All-Defensive";
-        } else if (i === 10) {
+            numG = 0;
+            numFC = 0;
+            i = 0;
+        } else if (dselect.length === 10) {
             awards.allDefensive.push({title: "Third Team", players: []});
             type = "Third Team All-Defensive";
+            numG = 0;
+            numFC = 0;
+            i = 0;
         }
-        _.last(awards.allDefensive).players.push({pid: p.pid, name: p.name, tid: p.tid, abbrev: p.abbrev, trb: p.stats.trb, blk: p.stats.blk, stl: p.stats.stl});
-        awardsByPlayer.push({pid: p.pid, tid: p.tid, name: p.name, type});
+        if (dselect.includes(p.pid)) {
+            continue;
+        }
+
+        if ((!isGuard && numFC < 3) || (isGuard && numG < 2)) {
+            dselect.push(p.pid);
+            numG += isGuard ? 1 : 0;
+            numFC += !isGuard ? 1 : 0;
+
+            _.last(awards.allDefensive).players.push({pid: p.pid, name: p.name, tid: p.tid, abbrev: p.abbrev, trb: p.stats.trb, blk: p.stats.blk, stl: p.stats.stl, pos: p.ratings.pos});
+            awardsByPlayer.push({pid: p.pid, tid: p.tid, name: p.name, type});
+        }
+
+        if (dselect.length === 15) {
+            break;
+        }
     }
 
     // Finals MVP - most WS in playoffs

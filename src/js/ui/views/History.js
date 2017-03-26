@@ -67,13 +67,13 @@ const History = ({awards, champ, confs, invalidSeason, retiredPlayers, season, u
                 {awards.allLeague.map(t => <div key={t.title}>
                     <h5>{t.title}</h5>
                     {t.players.map(p => <div key={p.pid}>
-                        <span className={p.tid === userTid ? 'bg-info' : null}><a href={helpers.leagueUrl(['player', p.pid])}>{p.name}</a> (<a href={helpers.leagueUrl(['roster', p.abbrev, season])}>{p.abbrev}</a>)</span><br />
+                        <span className={p.tid === userTid ? 'bg-info' : null}><small>{p.pos}</small> <a href={helpers.leagueUrl(['player', p.pid])}>{p.name}</a> (<a href={helpers.leagueUrl(['roster', p.abbrev, season])}>{p.abbrev}</a>)</span><br />
                     </div>)}
                 </div>)}
                 <br />
                 <h4>All-Rookie Team</h4>
                 {awards.allRookie.map(p => <div key={p.pid}>
-                    <span className={p.tid === userTid ? 'bg-info' : null}><a href={helpers.leagueUrl(['player', p.pid])}>{p.name}</a> (<a href={helpers.leagueUrl(['roster', p.abbrev, season])}>{p.abbrev}</a>)</span><br />
+                    <span className={p.tid === userTid ? 'bg-info' : null}><small>{p.pos}</small> <a href={helpers.leagueUrl(['player', p.pid])}>{p.name}</a> (<a href={helpers.leagueUrl(['roster', p.abbrev, season])}>{p.abbrev}</a>)</span><br />
                 </div>)}
                 <br />
             </div>
@@ -82,7 +82,7 @@ const History = ({awards, champ, confs, invalidSeason, retiredPlayers, season, u
                 {awards.allDefensive.map(t => <div key={t.title}>
                     <h5>{t.title}</h5>
                     {t.players.map(p => <div key={p.pid}>
-                        <span className={p.tid === userTid ? 'bg-info' : null}><a href={helpers.leagueUrl(['player', p.pid])}>{p.name}</a> (<a href={helpers.leagueUrl(['roster', p.abbrev, season])}>{p.abbrev}</a>)</span><br />
+                        <span className={p.tid === userTid ? 'bg-info' : null}><small>{p.pos}</small> <a href={helpers.leagueUrl(['player', p.pid])}>{p.name}</a> (<a href={helpers.leagueUrl(['roster', p.abbrev, season])}>{p.abbrev}</a>)</span><br />
                     </div>)}
                 </div>)}
                 <br />
